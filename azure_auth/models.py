@@ -24,30 +24,18 @@ class AppUser(AbstractUser):
         """Get all permissions for user (from roles + direct permissions)"""
         try:
             from permissions.mixins import PermissionMixin
-            # Create a temporary instance with the mixin to use its methods
-            class TempUser(PermissionMixin):
-                pass
-            temp = TempUser()
-            # Copy necessary attributes
-            for attr in ['id', 'user_roles', 'user_permissions']:
-                if hasattr(self, attr):
-                    setattr(temp, attr, getattr(self, attr))
-            return temp.get_all_permissions()
+            # Use the mixin method directly with self
+            return PermissionMixin.get_all_permissions(self)
         except ImportError:
             # permissions app not installed yet
-            return []
+            return self.__class__.objects.none()
 
     def has_permission(self, permission_name):
         """Check if user has a specific permission"""
         try:
             from permissions.mixins import PermissionMixin
-            class TempUser(PermissionMixin):
-                pass
-            temp = TempUser()
-            for attr in ['id', 'user_roles', 'user_permissions']:
-                if hasattr(self, attr):
-                    setattr(temp, attr, getattr(self, attr))
-            return temp.has_permission(permission_name)
+            # Use the mixin method directly with self
+            return PermissionMixin.has_permission(self, permission_name)
         except ImportError:
             return False
 
@@ -55,13 +43,8 @@ class AppUser(AbstractUser):
         """Check if user has any of the specified permissions"""
         try:
             from permissions.mixins import PermissionMixin
-            class TempUser(PermissionMixin):
-                pass
-            temp = TempUser()
-            for attr in ['id', 'user_roles', 'user_permissions']:
-                if hasattr(self, attr):
-                    setattr(temp, attr, getattr(self, attr))
-            return temp.has_any_permission(permission_names)
+            # Use the mixin method directly with self
+            return PermissionMixin.has_any_permission(self, permission_names)
         except ImportError:
             return False
 
@@ -69,13 +52,8 @@ class AppUser(AbstractUser):
         """Check if user has all of the specified permissions"""
         try:
             from permissions.mixins import PermissionMixin
-            class TempUser(PermissionMixin):
-                pass
-            temp = TempUser()
-            for attr in ['id', 'user_roles', 'user_permissions']:
-                if hasattr(self, attr):
-                    setattr(temp, attr, getattr(self, attr))
-            return temp.has_all_permissions(permission_names)
+            # Use the mixin method directly with self
+            return PermissionMixin.has_all_permissions(self, permission_names)
         except ImportError:
             return False
 
@@ -83,13 +61,8 @@ class AppUser(AbstractUser):
         """Check if user has any permission for a specific module"""
         try:
             from permissions.mixins import PermissionMixin
-            class TempUser(PermissionMixin):
-                pass
-            temp = TempUser()
-            for attr in ['id', 'user_roles', 'user_permissions']:
-                if hasattr(self, attr):
-                    setattr(temp, attr, getattr(self, attr))
-            return temp.has_module_access(module_name)
+            # Use the mixin method directly with self
+            return PermissionMixin.has_module_access(self, module_name)
         except ImportError:
             return False
 
@@ -97,13 +70,8 @@ class AppUser(AbstractUser):
         """Get user permissions grouped by module"""
         try:
             from permissions.mixins import PermissionMixin
-            class TempUser(PermissionMixin):
-                pass
-            temp = TempUser()
-            for attr in ['id', 'user_roles', 'user_permissions']:
-                if hasattr(self, attr):
-                    setattr(temp, attr, getattr(self, attr))
-            return temp.get_permissions_by_module()
+            # Use the mixin method directly with self
+            return PermissionMixin.get_permissions_by_module(self)
         except ImportError:
             return {}
 
@@ -111,12 +79,7 @@ class AppUser(AbstractUser):
         """Get user's active roles"""
         try:
             from permissions.mixins import PermissionMixin
-            class TempUser(PermissionMixin):
-                pass
-            temp = TempUser()
-            for attr in ['id', 'user_roles', 'user_permissions']:
-                if hasattr(self, attr):
-                    setattr(temp, attr, getattr(self, attr))
-            return temp.get_active_roles()
+            # Use the mixin method directly with self
+            return PermissionMixin.get_active_roles(self)
         except ImportError:
-            return []
+            return self.__class__.objects.none()

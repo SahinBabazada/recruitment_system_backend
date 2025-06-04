@@ -1,5 +1,6 @@
 # azure_auth/views.py
 
+import jwt
 import requests
 import urllib.parse
 from django.shortcuts import redirect
@@ -82,6 +83,10 @@ def local_login(request):
 @permission_classes([AllowAny])
 def local_register(request):
     """Traditional user registration"""
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    
     username = request.data.get('username')
     email = request.data.get('email')
     password = request.data.get('password')
@@ -279,6 +284,14 @@ def create_or_update_user_from_graph(user_info, access_token):
                 access_token=access_token
             )
             logger.info(f"Created new user: {user.username}")
+            
+            # Assign default role to new users
+            try:
+                from permissions.utils import assign_role_to_user
+                assign_role_to_user(user, 'Employee')  # or 'HR Specialist' depending on your needs
+                logger.info(f"Assigned default role 'Employee' to user: {user.username}")
+            except Exception as role_error:
+                logger.warning(f"Failed to assign default role to user {user.username}: {str(role_error)}")
         
         return user
         

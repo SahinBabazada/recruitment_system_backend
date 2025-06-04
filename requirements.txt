@@ -5,6 +5,7 @@ charset-normalizer==3.4.2
 cryptography==41.0.0
 Django==4.2
 django-cors-headers==4.3.0
+django-filter==25.1
 djangorestframework==3.14.0
 idna==3.10
 pycparser==2.22
@@ -13,4 +14,5 @@ python-dotenv==1.0.0
 pytz==2025.2
 requests==2.31.0
 sqlparse==0.5.3
+tzdata==2025.2
 urllib3==2.4.0

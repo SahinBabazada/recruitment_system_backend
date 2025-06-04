@@ -1,6 +1,6 @@
 # mpr/views.py
 from rest_framework import viewsets, status, filters
-from rest_framework.decorators import action, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
@@ -40,19 +40,21 @@ class JobViewSet(viewsets.ModelViewSet):
     ordering_fields = ['title', 'created_at']
     ordering = ['title']
 
+    permission_classes = [IsAuthenticated]
+    
     def get_permissions(self):
         """Dynamic permission based on action"""
         permission_map = {
             'list': 'mpr:view',
             'retrieve': 'mpr:view',
-            'create': 'mpr:edit',
+            'create': 'mpr:create',
             'update': 'mpr:edit',
             'partial_update': 'mpr:edit',
-            'destroy': 'mpr:edit',
-            'create_if_not_exists': 'mpr:edit',
+            'destroy': 'mpr:delete',
         }
+        
         required_permission = permission_map.get(self.action, 'mpr:view')
-        return [HasPermission(required_permission)]  # Removed extra ()
+        return [HasPermission(required_permission)]
 
     @action(detail=False, methods=['post'], permission_classes=[HasPermission('mpr:edit')])
     def create_if_not_exists(self, request):
@@ -102,7 +104,7 @@ class OrganizationalUnitViewSet(viewsets.ReadOnlyModelViewSet):
             'units': 'mpr:view',
         }
         required_permission = permission_map.get(self.action, 'mpr:view')
-        return [HasPermission(required_permission)]  # Removed extra ()
+        return [HasPermission(required_permission)]
 
     @action(detail=False, methods=['get'], permission_classes=[HasPermission('mpr:view')])
     def departments(self, request):
@@ -144,7 +146,7 @@ class LocationViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_permissions(self):
         """Dynamic permission based on action"""
-        return [HasPermission('mpr:view')]  # Removed extra ()
+        return [HasPermission('mpr:view')]
 
 
 class EmploymentTypeViewSet(viewsets.ReadOnlyModelViewSet):
@@ -156,7 +158,7 @@ class EmploymentTypeViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_permissions(self):
         """Dynamic permission based on action"""
-        return [HasPermission('mpr:view')]  # Removed extra ()
+        return [HasPermission('mpr:view')]
 
 
 class HiringReasonViewSet(viewsets.ReadOnlyModelViewSet):
@@ -168,7 +170,7 @@ class HiringReasonViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_permissions(self):
         """Dynamic permission based on action"""
-        return [HasPermission('mpr:view')]  # Removed extra ()
+        return [HasPermission('mpr:view')]
 
 
 class EmployeeViewSet(viewsets.ReadOnlyModelViewSet):
@@ -185,7 +187,7 @@ class EmployeeViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_permissions(self):
         """Dynamic permission based on action"""
-        return [HasPermission('mpr:view')]  # Removed extra ()
+        return [HasPermission('mpr:view')]
 
 
 class TechnicalSkillViewSet(viewsets.ModelViewSet):
@@ -210,7 +212,7 @@ class TechnicalSkillViewSet(viewsets.ModelViewSet):
             'create_if_not_exists': 'mpr:edit',
         }
         required_permission = permission_map.get(self.action, 'mpr:view')
-        return [HasPermission(required_permission)]  # Removed extra ()
+        return [HasPermission(required_permission)]
 
     @action(detail=False, methods=['post'], permission_classes=[HasPermission('mpr:edit')])
     def create_if_not_exists(self, request):
@@ -250,7 +252,7 @@ class LanguageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_permissions(self):
         """Dynamic permission based on action"""
-        return [HasPermission('mpr:view')]  # Removed extra ()
+        return [HasPermission('mpr:view')]
 
 
 class CompetencyViewSet(viewsets.ModelViewSet):
@@ -275,7 +277,7 @@ class CompetencyViewSet(viewsets.ModelViewSet):
             'create_if_not_exists': 'mpr:edit',
         }
         required_permission = permission_map.get(self.action, 'mpr:view')
-        return [HasPermission(required_permission)]  # Removed extra ()
+        return [HasPermission(required_permission)]
 
     @action(detail=False, methods=['post'], permission_classes=[HasPermission('mpr:edit')])
     def create_if_not_exists(self, request):
@@ -315,7 +317,7 @@ class ContractDurationViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_permissions(self):
         """Dynamic permission based on action"""
-        return [HasPermission('mpr:view')]  # Removed extra ()
+        return [HasPermission('mpr:view')]
 
 
 class MPRViewSet(viewsets.ModelViewSet):
@@ -328,9 +330,8 @@ class MPRViewSet(viewsets.ModelViewSet):
     ).prefetch_related(
         'technical_skills', 'required_languages', 'core_competencies',
         'comments', 'status_history'
-    ).annotate(
-        applicant_count=Count('id')  # Placeholder for candidate model
     )
+    # Remove the problematic annotation - the property will handle this
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = MPRFilter
@@ -384,7 +385,7 @@ class MPRViewSet(viewsets.ModelViewSet):
             'export': 'mpr:export',
         }
         required_permission = permission_map.get(self.action, 'mpr:view')
-        return [HasPermission(required_perm) for required_perm in required_permission] if isinstance(required_permission, list) else [HasPermission(required_permission)]  # Removed extra ()
+        return [HasPermission(required_perm) for required_perm in required_permission] if isinstance(required_permission, list) else [HasPermission(required_permission)]
 
     def perform_update(self, serializer):
         """Check if user can edit this MPR"""
@@ -417,7 +418,7 @@ class MPRViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        action = request.data.get('action')  # Directly access 'action' from request.data
+        action = request.data.get('action')
         reason = request.data.get('reason', '')
         
         try:
@@ -432,7 +433,7 @@ class MPRViewSet(viewsets.ModelViewSet):
                 mpr=mpr,
                 from_status='pending',
                 to_status=mpr.status,
-                changed_by=request.user.username,
+                changed_by=request.user,
                 reason=reason
             )
             
@@ -465,7 +466,7 @@ class MPRViewSet(viewsets.ModelViewSet):
             mpr=mpr,
             from_status=mpr.status,
             to_status='pending',
-            changed_by=request.user.username,
+            changed_by=request.user,
             reason='submitted for approval'
         )
         
@@ -481,11 +482,11 @@ class MPRViewSet(viewsets.ModelViewSet):
         serializer = MPRCommentSerializer(data=request.data, context={'user': request.user, 'mpr': mpr})
         
         if serializer.is_valid():
-            serializer.save(mpr=mpr, created_by=request.user)
+            serializer.save(mpr=mpr, user=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['get'], permission_classes=[HasPermission('mpr:read')])
+    @action(detail=True, methods=['get'], permission_classes=[HasPermission('mpr:view')])
     def comments(self, request, pk=None):
         """Get MPR comments"""
         mpr = self.get_object()
@@ -497,7 +498,7 @@ class MPRViewSet(viewsets.ModelViewSet):
         serializer = MPRCommentSerializer(comments, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['get'], permission_classes=[HasPermission('mpr:read')])
+    @action(detail=True, methods=['get'], permission_classes=[HasPermission('mpr:view')])
     def status_history(self, request, pk=None):
         """Get MPR status history"""
         mpr = self.get_object()
