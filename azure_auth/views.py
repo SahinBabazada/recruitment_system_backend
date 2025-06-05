@@ -7,13 +7,19 @@ from django.shortcuts import redirect
 from django.conf import settings
 from django.contrib.auth import login
 from django.http import JsonResponse
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status,viewsets
 
 from django.contrib.auth import authenticate, login as django_login
 from rest_framework.authtoken.models import Token
+
+from django.contrib.auth import get_user_model
+from django.db.models import Q, Count
+from permissions.decorators import permission_required
+
+User = get_user_model()
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -566,3 +572,154 @@ def debug_token(request):
             'error': 'Debug failed',
             'exception': str(e)
         })
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing users"""
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Apply filters
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(username__icontains=search) |
+                Q(email__icontains=search)
+            )
+        
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+            
+        is_staff = self.request.query_params.get('is_staff')
+        if is_staff is not None:
+            queryset = queryset.filter(is_staff=is_staff.lower() == 'true')
+            
+        is_superuser = self.request.query_params.get('is_superuser')
+        if is_superuser is not None:
+            queryset = queryset.filter(is_superuser=is_superuser.lower() == 'true')
+            
+        has_azure_id = self.request.query_params.get('has_azure_id')
+        if has_azure_id is not None:
+            if has_azure_id.lower() == 'true':
+                queryset = queryset.exclude(azure_id__isnull=True).exclude(azure_id='')
+            else:
+                queryset = queryset.filter(Q(azure_id__isnull=True) | Q(azure_id=''))
+        
+        return queryset.select_related().prefetch_related('rbac_user_roles__role')
+
+    @permission_required('user:view')
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @permission_required('user:view')
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
+    @permission_required('user:create')
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @permission_required('user:edit')
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+
+    @permission_required('user:delete')
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=False, methods=['get'])
+    @permission_required('user:view')
+    def stats(self, request):
+        """Get user statistics"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        now = timezone.now()
+        recent_threshold = now - timedelta(days=7)
+        
+        stats = {
+            'total_users': User.objects.count(),
+            'active_users': User.objects.filter(is_active=True).count(),
+            'inactive_users': User.objects.filter(is_active=False).count(),
+            'staff_users': User.objects.filter(is_staff=True).count(),
+            'azure_users': User.objects.exclude(azure_id__isnull=True).exclude(azure_id='').count(),
+            'local_users': User.objects.filter(Q(azure_id__isnull=True) | Q(azure_id='')).count(),
+            'recent_logins': User.objects.filter(last_login__gte=recent_threshold).count(),
+        }
+        return Response(stats)
+
+    @action(detail=True, methods=['get'])
+    @permission_required('user:view')
+    def permission_summary(self, request, pk=None):
+        """Get user permission summary using backend utility"""
+        user = self.get_object()
+        from permissions.utils import get_rbac_user_permissions_summary
+        summary = get_rbac_user_permissions_summary(user)
+        return Response(summary)
+
+    @action(detail=False, methods=['post'])
+    @permission_required('user:edit')
+    def bulk_toggle_status(self, request):
+        """Bulk activate/deactivate users"""
+        user_ids = request.data.get('user_ids', [])
+        is_active = request.data.get('is_active', True)
+        
+        updated_count = User.objects.filter(id__in=user_ids).update(is_active=is_active)
+        
+        return Response({
+            'updated_count': updated_count,
+            'message': f'Successfully {"activated" if is_active else "deactivated"} {updated_count} users'
+        })
+
+    @action(detail=False, methods=['post'])
+    @permission_required('role:assign')
+    def bulk_assign_role(self, request):
+        """Bulk assign role to users"""
+        user_ids = request.data.get('user_ids', [])
+        role_id = request.data.get('role_id')
+        
+        from permissions.models import Role, UserRole
+        
+        try:
+            role = Role.objects.get(id=role_id)
+            assigned_count = 0
+            
+            for user_id in user_ids:
+                user_role, created = UserRole.objects.get_or_create(
+                    user_id=user_id,
+                    role=role,
+                    defaults={'assigned_by': request.user}
+                )
+                if created:
+                    assigned_count += 1
+            
+            return Response({
+                'assigned_count': assigned_count,
+                'message': f'Successfully assigned role to {assigned_count} users'
+            })
+        except Role.DoesNotExist:
+            return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=True, methods=['post'])
+    @permission_required('user:reset_password')
+    def reset_password(self, request, pk=None):
+        """Reset user password (for local users only)"""
+        user = self.get_object()
+        new_password = request.data.get('new_password')
+        
+        if not new_password:
+            return Response({'error': 'New password is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if user.azure_id:
+            return Response({'error': 'Cannot reset password for Azure SSO users'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user.set_password(new_password)
+        user.save()
+        
+        return Response({'message': 'Password reset successfully'})

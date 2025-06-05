@@ -1,0 +1,36 @@
+INFO 2025-06-04 17:16:34,409 signals 33010 6134476800 New email service created: hrop (hroperations@azerbaijansupermarket.com)
+INFO 2025-06-04 17:16:50,046 services 33010 6186102784 Successfully obtained access token for hroperations@azerbaijansupermarket.com
+INFO 2025-06-04 17:16:51,392 services 33010 6186102784 Starting email sync for hrop from folder inbox
+INFO 2025-06-04 17:17:05,796 services 33010 6186102784 Processed batch: 50 messages, Total: 50
+INFO 2025-06-04 17:17:05,801 signals 33010 6186102784 Email service updated: hrop (hroperations@azerbaijansupermarket.com)
+INFO 2025-06-04 17:17:05,802 services 33010 6186102784 Email sync completed: 50 processed, 50 created, 0 updated
+INFO 2025-06-04 17:26:00,030 services 33010 6134476800 Successfully obtained access token for hroperations@azerbaijansupermarket.com
+INFO 2025-06-04 17:26:01,265 services 33010 6134476800 Starting email sync for hrop from folder inbox
+INFO 2025-06-04 17:26:03,442 signals 33010 6134476800 Email service updated: hrop (hroperations@azerbaijansupermarket.com)
+INFO 2025-06-04 17:26:03,443 services 33010 6134476800 Email sync completed: 0 processed, 0 created, 0 updated
+ERROR 2025-06-04 17:35:13,582 views 33010 6134476800 Failed to get emails: name 'models' is not defined
+ERROR 2025-06-04 17:35:13,740 views 33010 6168702976 Failed to get emails: name 'models' is not defined
+ERROR 2025-06-04 17:35:13,755 views 33010 6151303168 Failed to get emails: name 'models' is not defined
+ERROR 2025-06-04 17:35:14,027 views 33010 6185529344 Failed to get emails: name 'models' is not defined
+ERROR 2025-06-04 17:35:16,095 views 33010 6134476800 Failed to get emails: name 'models' is not defined
+ERROR 2025-06-04 17:35:18,252 views 33010 6202355712 Failed to get emails: name 'models' is not defined
+INFO 2025-06-04 17:37:58,961 services 33010 6134476800 Successfully obtained access token for hroperations@azerbaijansupermarket.com
+INFO 2025-06-04 17:38:00,334 services 33010 6134476800 Starting email sync for hrop from folder inbox
+INFO 2025-06-04 17:38:01,653 signals 33010 6134476800 Email service updated: hrop (hroperations@azerbaijansupermarket.com)
+INFO 2025-06-04 17:38:01,653 services 33010 6134476800 Email sync completed: 0 processed, 0 created, 0 updated
+INFO 2025-06-04 17:45:41,433 services 33010 6134476800 Successfully obtained access token for hroperations@azerbaijansupermarket.com
+INFO 2025-06-04 17:45:41,847 services 33010 6134476800 Starting email sync for hrop from folder inbox
+INFO 2025-06-04 17:45:42,260 signals 33010 6134476800 Email service updated: hrop (hroperations@azerbaijansupermarket.com)
+INFO 2025-06-04 17:45:42,261 services 33010 6134476800 Email sync completed: 0 processed, 0 created, 0 updated
+INFO 2025-06-04 17:46:35,327 services 33010 6134476800 Successfully obtained access token for hroperations@azerbaijansupermarket.com
+INFO 2025-06-04 17:46:35,754 services 33010 6134476800 Starting email sync for hrop from folder inbox
+INFO 2025-06-04 17:46:36,218 signals 33010 6134476800 Email service updated: hrop (hroperations@azerbaijansupermarket.com)
+INFO 2025-06-04 17:46:36,218 services 33010 6134476800 Email sync completed: 0 processed, 0 created, 0 updated
+INFO 2025-06-04 20:46:21,503 services 33010 6185529344 Successfully obtained access token for hroperations@azerbaijansupermarket.com
+INFO 2025-06-04 20:46:22,798 services 33010 6185529344 Starting email sync for hrop from folder inbox
+INFO 2025-06-04 20:46:24,302 signals 33010 6185529344 Email service updated: hrop (hroperations@azerbaijansupermarket.com)
+INFO 2025-06-04 20:46:24,303 services 33010 6185529344 Email sync completed: 0 processed, 0 created, 0 updated
+INFO 2025-06-04 20:46:31,262 services 33010 6185529344 Successfully obtained access token for hroperations@azerbaijansupermarket.com
+INFO 2025-06-04 20:46:32,482 services 33010 6185529344 Starting email sync for hrop from folder inbox
+INFO 2025-06-04 20:46:33,741 signals 33010 6185529344 Email service updated: hrop (hroperations@azerbaijansupermarket.com)
+INFO 2025-06-04 20:46:33,741 services 33010 6185529344 Email sync completed: 0 processed, 0 created, 0 updated

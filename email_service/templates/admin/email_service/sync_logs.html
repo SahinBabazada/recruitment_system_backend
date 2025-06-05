@@ -1,0 +1,85 @@
+<!-- email_service/templates/admin/email_service/sync_logs.html -->
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block title %}Sync Logs - {{ service.name }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:email_service_emailservicesetting_changelist' %}">Email service settings</a>
+    &rsaquo; Sync Logs - {{ service.name }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="module aligned">
+    <h1>Sync Logs for {{ service.name }}</h1>
+    
+    <div class="form-row">
+        <div class="field-box">
+            <h3>Service Information</h3>
+            <p><strong>Name:</strong> {{ service.name }}</p>
+            <p><strong>Email:</strong> {{ service.email }}</p>
+            <p><strong>Last Sync:</strong> {{ service.last_sync_at|default:"Never" }}</p>
+        </div>
+    </div>
+
+    {% if logs %}
+    <div class="results">
+        <table id="result_list">
+            <thead>
+                <tr>
+                    <th scope="col">Status</th>
+                    <th scope="col">Started</th>
+                    <th scope="col">Completed</th>
+                    <th scope="col">Duration</th>
+                    <th scope="col">Processed</th>
+                    <th scope="col">Created</th>
+                    <th scope="col">Updated</th>
+                    <th scope="col">Error</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr class="{% cycle 'row1' 'row2' %}">
+                    <td>
+                        <span class="status-{{ log.status }}">{{ log.get_status_display }}</span>
+                    </td>
+                    <td>{{ log.sync_started_at|date:"Y-m-d H:i:s" }}</td>
+                    <td>{{ log.sync_completed_at|date:"Y-m-d H:i:s"|default:"-" }}</td>
+                    <td>{{ log.duration|default:"-" }}</td>
+                    <td>{{ log.emails_processed }}</td>
+                    <td>{{ log.emails_created }}</td>
+                    <td>{{ log.emails_updated }}</td>
+                    <td>
+                        {% if log.error_message %}
+                            <span title="{{ log.error_message }}" style="color: #e74c3c;">
+                                {{ log.error_message|truncatechars:50 }}
+                            </span>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No sync logs found for this service.</p>
+    {% endif %}
+
+    <div class="submit-row">
+        <a href="{% url 'admin:email_service_emailservicesetting_changelist' %}" class="button">Back to Services</a>
+        <a href="{% url 'admin:sync-emails' service.id %}" class="button default">Start New Sync</a>
+    </div>
+</div>
+
+<style>
+.status-completed { color: #27ae60; font-weight: bold; }
+.status-running { color: #3498db; font-weight: bold; }
+.status-failed { color: #e74c3c; font-weight: bold; }
+.status-cancelled { color: #f39c12; font-weight: bold; }
+</style>
+{% endblock %}

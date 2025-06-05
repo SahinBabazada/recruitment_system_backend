@@ -1,0 +1,70 @@
+<!-- email_service/templates/admin/email_service/sync_confirm.html -->
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block title %}Sync Emails - {{ service.name }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:email_service_emailservicesetting_changelist' %}">Email service settings</a>
+    &rsaquo; Sync Emails - {{ service.name }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="module aligned">
+    <h1>Sync Emails for {{ service.name }}</h1>
+    
+    <div class="form-row">
+        <div class="field-box">
+            <h3>Service Information</h3>
+            <p><strong>Name:</strong> {{ service.name }}</p>
+            <p><strong>Email:</strong> {{ service.email }}</p>
+            <p><strong>Last Sync:</strong> {{ service.last_sync_at|default:"Never" }}</p>
+            <p><strong>Sync Enabled:</strong> {% if service.sync_enabled %}Yes{% else %}No{% endif %}</p>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="field-box">
+            <h3>Sync Options</h3>
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-row">
+                    <label for="id_folder">Folder:</label>
+                    <select name="folder" id="id_folder">
+                        <option value="inbox" selected>Inbox</option>
+                        <option value="sent">Sent Items</option>
+                        <option value="drafts">Drafts</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label for="id_max_emails">Max Emails:</label>
+                    <input type="number" name="max_emails" id="id_max_emails" value="100" min="1" max="1000">
+                </div>
+                <div class="form-row">
+                    <label for="id_force_full_sync">
+                        <input type="checkbox" name="force_full_sync" id="id_force_full_sync">
+                        Force full sync (ignore last sync time)
+                    </label>
+                </div>
+                <div class="submit-row">
+                    <input type="submit" value="Start Sync" class="default" />
+                    <a href="{% url 'admin:email_service_emailservicesetting_changelist' %}" class="button cancel-link">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="field-box">
+            <h3>Warning</h3>
+            <p style="color: #e74c3c;">
+                <strong>Note:</strong> Email synchronization may take several minutes depending on the number of emails. 
+                The process will run in the background and you can check the sync logs for progress updates.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
