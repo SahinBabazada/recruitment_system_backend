@@ -27,6 +27,16 @@ class Command(BaseCommand):
                 ('export', 'Export MPR data'),
             ],
             
+             'user': [
+                ('create', 'Create new users'),
+                ('view', 'View user profiles'),
+                ('edit', 'Edit user information'),
+                ('delete', 'Delete users'),
+                ('activate', 'Activate/Deactivate users'),
+                ('reset_password', 'Reset user passwords'),
+                ('view_all', 'View all users (bypass ownership)'),
+            ],   
+
             # Interview permissions
             'interview': [
                 ('create', 'Schedule interviews'),

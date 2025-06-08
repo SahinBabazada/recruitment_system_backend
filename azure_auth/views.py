@@ -48,7 +48,7 @@ def local_login(request):
 
     User = get_user_model()
 
-    username_or_email = request.data.get('username')  # This field can contain username OR email
+    username_or_email = request.data.get('username')
     password = request.data.get('password')
     
     if not username_or_email or not password:
@@ -56,14 +56,12 @@ def local_login(request):
     
     # Check if it's an email (contains @)
     if '@' in username_or_email:
-        # It's an email, find the user by email
         try:
             user_obj = User.objects.get(email=username_or_email)
             username = user_obj.username
         except User.DoesNotExist:
             return JsonResponse({'error': 'Invalid credentials'}, status=400)
     else:
-        # It's a username
         username = username_or_email
     
     # Authenticate with username
@@ -181,14 +179,9 @@ def azure_callback(request):
             return redirect(f"{frontend_error_url}?{error_params}")
         
         access_token = token_json['access_token']
-        id_token = token_json.get('id_token')  # This is what we need for user verification
-        
-        # If we have an ID token, use it for user verification, otherwise use access token
-        token_to_verify = id_token if id_token else access_token
         
         # Get user info and create/update user
         try:
-            # Instead of verifying JWT (which is complex), let's get user info from Microsoft Graph
             user_info = get_user_info_from_graph(access_token)
             user = create_or_update_user_from_graph(user_info, access_token)
             
@@ -243,11 +236,10 @@ def create_or_update_user_from_graph(user_info, access_token):
     
     try:
         # Extract user information from Graph API response
-        azure_id = user_info.get('id')  # Microsoft Graph uses 'id' not 'oid'
+        azure_id = user_info.get('id')
         email = user_info.get('mail') or user_info.get('userPrincipalName')
         given_name = user_info.get('givenName', '')
         surname = user_info.get('surname', '')
-        display_name = user_info.get('displayName', '')
         
         logger.info(f"Creating/updating user - Azure ID: {azure_id}, Email: {email}")
         
@@ -271,8 +263,8 @@ def create_or_update_user_from_graph(user_info, access_token):
             logger.info(f"Updated existing user: {user.username}")
             
         except User.DoesNotExist:
-            # Create new user
-            username = email.split('@')[0]  # Use email prefix as username
+            # Create new user without password (Azure user)
+            username = email.split('@')[0]
             
             # Ensure username is unique
             counter = 1
@@ -288,13 +280,14 @@ def create_or_update_user_from_graph(user_info, access_token):
                 last_name=surname,
                 azure_id=azure_id,
                 access_token=access_token
+                # No password set for Azure users
             )
-            logger.info(f"Created new user: {user.username}")
+            logger.info(f"Created new Azure user: {user.username}")
             
             # Assign default role to new users
             try:
                 from permissions.utils import assign_role_to_user
-                assign_role_to_user(user, 'Employee')  # or 'HR Specialist' depending on your needs
+                assign_role_to_user(user, 'Employee')
                 logger.info(f"Assigned default role 'Employee' to user: {user.username}")
             except Exception as role_error:
                 logger.warning(f"Failed to assign default role to user {user.username}: {str(role_error)}")
@@ -304,7 +297,6 @@ def create_or_update_user_from_graph(user_info, access_token):
     except Exception as e:
         logger.error(f"Error creating/updating user: {str(e)}")
         raise Exception(f'User creation failed: {str(e)}')
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -572,154 +564,3 @@ def debug_token(request):
             'error': 'Debug failed',
             'exception': str(e)
         })
-
-
-class UserViewSet(viewsets.ModelViewSet):
-    """ViewSet for managing users"""
-    queryset = User.objects.all()
-    permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        
-        # Apply filters
-        search = self.request.query_params.get('search')
-        if search:
-            queryset = queryset.filter(
-                Q(first_name__icontains=search) |
-                Q(last_name__icontains=search) |
-                Q(username__icontains=search) |
-                Q(email__icontains=search)
-            )
-        
-        is_active = self.request.query_params.get('is_active')
-        if is_active is not None:
-            queryset = queryset.filter(is_active=is_active.lower() == 'true')
-            
-        is_staff = self.request.query_params.get('is_staff')
-        if is_staff is not None:
-            queryset = queryset.filter(is_staff=is_staff.lower() == 'true')
-            
-        is_superuser = self.request.query_params.get('is_superuser')
-        if is_superuser is not None:
-            queryset = queryset.filter(is_superuser=is_superuser.lower() == 'true')
-            
-        has_azure_id = self.request.query_params.get('has_azure_id')
-        if has_azure_id is not None:
-            if has_azure_id.lower() == 'true':
-                queryset = queryset.exclude(azure_id__isnull=True).exclude(azure_id='')
-            else:
-                queryset = queryset.filter(Q(azure_id__isnull=True) | Q(azure_id=''))
-        
-        return queryset.select_related().prefetch_related('rbac_user_roles__role')
-
-    @permission_required('user:view')
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-
-    @permission_required('user:view')
-    def retrieve(self, request, *args, **kwargs):
-        return super().retrieve(request, *args, **kwargs)
-
-    @permission_required('user:create')
-    def create(self, request, *args, **kwargs):
-        return super().create(request, *args, **kwargs)
-
-    @permission_required('user:edit')
-    def update(self, request, *args, **kwargs):
-        return super().update(request, *args, **kwargs)
-
-    @permission_required('user:delete')
-    def destroy(self, request, *args, **kwargs):
-        return super().destroy(request, *args, **kwargs)
-
-    @action(detail=False, methods=['get'])
-    @permission_required('user:view')
-    def stats(self, request):
-        """Get user statistics"""
-        from django.utils import timezone
-        from datetime import timedelta
-        
-        now = timezone.now()
-        recent_threshold = now - timedelta(days=7)
-        
-        stats = {
-            'total_users': User.objects.count(),
-            'active_users': User.objects.filter(is_active=True).count(),
-            'inactive_users': User.objects.filter(is_active=False).count(),
-            'staff_users': User.objects.filter(is_staff=True).count(),
-            'azure_users': User.objects.exclude(azure_id__isnull=True).exclude(azure_id='').count(),
-            'local_users': User.objects.filter(Q(azure_id__isnull=True) | Q(azure_id='')).count(),
-            'recent_logins': User.objects.filter(last_login__gte=recent_threshold).count(),
-        }
-        return Response(stats)
-
-    @action(detail=True, methods=['get'])
-    @permission_required('user:view')
-    def permission_summary(self, request, pk=None):
-        """Get user permission summary using backend utility"""
-        user = self.get_object()
-        from permissions.utils import get_rbac_user_permissions_summary
-        summary = get_rbac_user_permissions_summary(user)
-        return Response(summary)
-
-    @action(detail=False, methods=['post'])
-    @permission_required('user:edit')
-    def bulk_toggle_status(self, request):
-        """Bulk activate/deactivate users"""
-        user_ids = request.data.get('user_ids', [])
-        is_active = request.data.get('is_active', True)
-        
-        updated_count = User.objects.filter(id__in=user_ids).update(is_active=is_active)
-        
-        return Response({
-            'updated_count': updated_count,
-            'message': f'Successfully {"activated" if is_active else "deactivated"} {updated_count} users'
-        })
-
-    @action(detail=False, methods=['post'])
-    @permission_required('role:assign')
-    def bulk_assign_role(self, request):
-        """Bulk assign role to users"""
-        user_ids = request.data.get('user_ids', [])
-        role_id = request.data.get('role_id')
-        
-        from permissions.models import Role, UserRole
-        
-        try:
-            role = Role.objects.get(id=role_id)
-            assigned_count = 0
-            
-            for user_id in user_ids:
-                user_role, created = UserRole.objects.get_or_create(
-                    user_id=user_id,
-                    role=role,
-                    defaults={'assigned_by': request.user}
-                )
-                if created:
-                    assigned_count += 1
-            
-            return Response({
-                'assigned_count': assigned_count,
-                'message': f'Successfully assigned role to {assigned_count} users'
-            })
-        except Role.DoesNotExist:
-            return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
-
-    @action(detail=True, methods=['post'])
-    @permission_required('user:reset_password')
-    def reset_password(self, request, pk=None):
-        """Reset user password (for local users only)"""
-        user = self.get_object()
-        new_password = request.data.get('new_password')
-        
-        if not new_password:
-            return Response({'error': 'New password is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        if user.azure_id:
-            return Response({'error': 'Cannot reset password for Azure SSO users'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        user.set_password(new_password)
-        user.save()
-        
-        return Response({'message': 'Password reset successfully'})

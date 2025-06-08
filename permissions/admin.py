@@ -119,6 +119,7 @@ class UserRoleAdmin(admin.ModelAdmin):
     list_filter = ['is_active', 'role', 'assigned_at', 'expires_at']
     search_fields = ['user__username', 'user__email', 'role__name']
     readonly_fields = ['assigned_at']
+    list_select_related = ['user', 'role', 'assigned_by']
     autocomplete_fields = ['user', 'role', 'assigned_by']
     list_per_page = 100
     
@@ -149,6 +150,7 @@ class UserPermissionAdmin(admin.ModelAdmin):
     search_fields = ['user__username', 'user__email', 'permission__name']
     readonly_fields = ['granted_at']
     autocomplete_fields = ['user', 'permission', 'granted_by']
+    list_select_related = ['user', 'permission', 'granted_by']
     list_per_page = 100
     
     fieldsets = (

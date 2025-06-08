@@ -1,12 +1,6 @@
 # azure_auth/urls.py
 from django.urls import path, include
-from rest_framework.routers import DefaultRouter
 from . import views
-
-from azure_auth.views import UserViewSet  # or wherever you put the viewset
-
-router = DefaultRouter()
-router.register(r'users', UserViewSet)
 
 urlpatterns = [
     path('login/', views.azure_login, name='azure_login'),
@@ -21,6 +15,4 @@ urlpatterns = [
     #Local auth URLs
     path('local/login/', views.local_login, name='local_login'),
     path('local/register/', views.local_register, name='local_register'),
-
-    path('api/', include(router.urls)),
 ]

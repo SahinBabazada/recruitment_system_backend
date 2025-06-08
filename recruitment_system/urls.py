@@ -9,6 +9,7 @@ urlpatterns = [
     path('mpr/', include('mpr.urls')),
     path('permissions/', include('permissions.urls')),
     path('email_service/', include('email_service.urls')),
+    path('users/', include('users.urls')),
 ]
 
 # Add debug toolbar URLs for development

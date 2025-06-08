@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'permissions',
     'mpr',
     'email_service',
+    'users',
 ]
 
 MIDDLEWARE = [
@@ -447,6 +448,12 @@ LOGGING = {
             'propagate': False,
         },
         
+        # User Permissions
+        # 'users': {
+        #     'handlers': ['file', 'console'],
+        #     'level': LOG_LEVEL,
+        #     'propagate': True,
+        # },
         # Celery Task Logging
         'celery': {
             'handlers': ['console', 'file_celery'],
