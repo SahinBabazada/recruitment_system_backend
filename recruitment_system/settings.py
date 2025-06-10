@@ -49,6 +49,8 @@ INSTALLED_APPS = [
     'mpr',
     'email_service',
     'users',
+    'candidate',
+    'interview',
 ]
 
 MIDDLEWARE = [

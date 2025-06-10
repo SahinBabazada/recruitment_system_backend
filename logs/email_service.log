@@ -44,3 +44,8 @@ INFO 2025-06-05 17:02:34,906 services 5296 11724 Starting email sync for hrop fr
 INFO 2025-06-05 17:02:36,354 services 5296 11724 Processed batch: 1 messages, Total: 1
 INFO 2025-06-05 17:02:36,415 signals 5296 11724 Email service updated: hrop (hroperations@azerbaijansupermarket.com)
 INFO 2025-06-05 17:02:36,417 services 5296 11724 Email sync completed: 1 processed, 1 created, 0 updated
+INFO 2025-06-08 22:29:54,294 services 53245 6201356288 Successfully obtained access token for hroperations@azerbaijansupermarket.com
+INFO 2025-06-08 22:29:55,539 services 53245 6201356288 Starting email sync for hrop from folder inbox
+INFO 2025-06-08 22:29:57,267 services 53245 6201356288 Processed batch: 1 messages, Total: 1
+INFO 2025-06-08 22:29:57,285 signals 53245 6201356288 Email service updated: hrop (hroperations@azerbaijansupermarket.com)
+INFO 2025-06-08 22:29:57,285 services 53245 6201356288 Email sync completed: 1 processed, 1 created, 0 updated

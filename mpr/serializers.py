@@ -4,11 +4,10 @@ from django.contrib.auth import get_user_model
 from .models import (
     Job, OrganizationalUnit, Location, EmploymentType, HiringReason,
     Employee, TechnicalSkill, Language, Competency, ContractDuration,
-    MPR, MPRComment, MPRStatusHistory
+    MPR, MPRComment, MPRStatusHistory, Recruiter, Manager, BudgetHolder, BudgetSponsor
 )
 
 User = get_user_model()
-
 
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
@@ -20,7 +19,6 @@ class UserSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip() or obj.username
 
-
 class JobSerializer(serializers.ModelSerializer):
     class Meta:
         model = Job
@@ -29,7 +27,6 @@ class JobSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user
         return super().create(validated_data)
-
 
 class OrganizationalUnitSerializer(serializers.ModelSerializer):
     parent_name = serializers.CharField(source='parent.name', read_only=True)
@@ -48,7 +45,6 @@ class OrganizationalUnitSerializer(serializers.ModelSerializer):
             return OrganizationalUnitSerializer(obj.children.all(), many=True, context=self.context).data
         return []
 
-
 class LocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Location
@@ -57,18 +53,15 @@ class LocationSerializer(serializers.ModelSerializer):
             'location_type', 'is_active'
         ]
 
-
 class EmploymentTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmploymentType
         fields = ['id', 'name', 'description', 'is_active', 'is_default']
 
-
 class HiringReasonSerializer(serializers.ModelSerializer):
     class Meta:
         model = HiringReason
         fields = ['id', 'name', 'description', 'is_active', 'is_default']
-
 
 class EmployeeSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(read_only=True)
@@ -84,7 +77,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'location', 'location_name', 'hire_date', 'is_active'
         ]
 
-
 class TechnicalSkillSerializer(serializers.ModelSerializer):
     class Meta:
         model = TechnicalSkill
@@ -94,12 +86,10 @@ class TechnicalSkillSerializer(serializers.ModelSerializer):
         validated_data['created_by'] = self.context['request'].user
         return super().create(validated_data)
 
-
 class LanguageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Language
         fields = ['id', 'name', 'code', 'is_active']
-
 
 class CompetencySerializer(serializers.ModelSerializer):
     class Meta:
@@ -110,12 +100,10 @@ class CompetencySerializer(serializers.ModelSerializer):
         validated_data['created_by'] = self.context['request'].user
         return super().create(validated_data)
 
-
 class ContractDurationSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContractDuration
         fields = ['id', 'name', 'months', 'description', 'is_active', 'is_default']
-
 
 class MPRCommentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -133,7 +121,6 @@ class MPRCommentSerializer(serializers.ModelSerializer):
         validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
 
-
 class MPRStatusHistorySerializer(serializers.ModelSerializer):
     changed_by = UserSerializer(read_only=True)
 
@@ -144,7 +131,6 @@ class MPRStatusHistorySerializer(serializers.ModelSerializer):
             'changed_at', 'reason'
         ]
         read_only_fields = ['changed_at']
-
 
 class MPRListSerializer(serializers.ModelSerializer):
     """Serializer for MPR list view with minimal data"""
@@ -164,7 +150,6 @@ class MPRListSerializer(serializers.ModelSerializer):
             'desired_start_date', 'created_by', 'created_at',
             'applicant_count'
         ]
-
 
 class MPRDetailSerializer(serializers.ModelSerializer):
     """Serializer for MPR detail view with full data"""
@@ -354,7 +339,6 @@ class MPRDetailSerializer(serializers.ModelSerializer):
         
         return data
 
-
 class MPRCreateSerializer(MPRDetailSerializer):
     """Serializer for creating MPR with required fields validation"""
     
@@ -383,7 +367,6 @@ class MPRCreateSerializer(MPRDetailSerializer):
         
         return data
 
-
 class MPRApprovalSerializer(serializers.Serializer):
     """Serializer for MPR approval/rejection actions"""
     action = serializers.ChoiceField(choices=['approve', 'reject'])
@@ -395,3 +378,296 @@ class MPRApprovalSerializer(serializers.Serializer):
                 "Reason is required when rejecting an MPR"
             )
         return data
+
+class RecruiterSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    user_id = serializers.IntegerField(write_only=True)
+    assigned_by = UserSerializer(read_only=True)
+    organizational_unit_name = serializers.CharField(source='organizational_unit.name', read_only=True)
+
+    class Meta:
+        model = Recruiter
+        fields = [
+            'id', 'user', 'user_id', 'organizational_unit', 'organizational_unit_name',
+            'is_primary', 'specialization', 'is_active', 'assigned_at', 'assigned_by'
+        ]
+        read_only_fields = ['assigned_at']
+
+    def create(self, validated_data):
+        validated_data['assigned_by'] = self.context['request'].user
+        return super().create(validated_data)
+
+class ManagerSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    user_id = serializers.IntegerField(write_only=True)
+    assigned_by = UserSerializer(read_only=True)
+    organizational_unit_name = serializers.CharField(source='organizational_unit.name', read_only=True)
+
+    class Meta:
+        model = Manager
+        fields = [
+            'id', 'user', 'user_id', 'organizational_unit', 'organizational_unit_name',
+            'is_primary', 'manager_type', 'is_active', 'assigned_at', 'assigned_by'
+        ]
+        read_only_fields = ['assigned_at']
+
+    def create(self, validated_data):
+        validated_data['assigned_by'] = self.context['request'].user
+        return super().create(validated_data)
+
+class BudgetHolderSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    user_id = serializers.IntegerField(write_only=True)
+    assigned_by = UserSerializer(read_only=True)
+    organizational_unit_name = serializers.CharField(source='organizational_unit.name', read_only=True)
+
+    class Meta:
+        model = BudgetHolder
+        fields = [
+            'id', 'user', 'user_id', 'organizational_unit', 'organizational_unit_name',
+            'is_primary', 'budget_limit', 'budget_type', 'is_active', 'assigned_at', 'assigned_by'
+        ]
+        read_only_fields = ['assigned_at']
+
+    def create(self, validated_data):
+        validated_data['assigned_by'] = self.context['request'].user
+        return super().create(validated_data)
+
+class BudgetSponsorSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    user_id = serializers.IntegerField(write_only=True)
+    assigned_by = UserSerializer(read_only=True)
+    organizational_unit_name = serializers.CharField(source='organizational_unit.name', read_only=True)
+
+    class Meta:
+        model = BudgetSponsor
+        fields = [
+            'id', 'user', 'user_id', 'organizational_unit', 'organizational_unit_name',
+            'is_primary', 'approval_limit', 'sponsor_level', 'is_active', 'assigned_at', 'assigned_by'
+        ]
+        read_only_fields = ['assigned_at']
+
+    def create(self, validated_data):
+        validated_data['assigned_by'] = self.context['request'].user
+        return super().create(validated_data)
+
+class OrganizationalUnitDetailSerializer(serializers.ModelSerializer):
+    parent_name = serializers.CharField(source='parent.name', read_only=True)
+    full_path = serializers.CharField(read_only=True)
+    location_name = serializers.CharField(source='location.name', read_only=True)
+    created_by = UserSerializer(read_only=True)
+    
+    # Primary role assignments
+    primary_recruiter = UserSerializer(read_only=True)
+    primary_recruiter_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    
+    primary_manager = UserSerializer(read_only=True)
+    primary_manager_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    
+    primary_budget_holder = UserSerializer(read_only=True)
+    primary_budget_holder_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    
+    primary_budget_sponsor = UserSerializer(read_only=True)
+    primary_budget_sponsor_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    
+    # Related role assignments
+    recruiters = RecruiterSerializer(many=True, read_only=True)
+    managers = ManagerSerializer(many=True, read_only=True)
+    budget_holders = BudgetHolderSerializer(many=True, read_only=True)
+    budget_sponsors = BudgetSponsorSerializer(many=True, read_only=True)
+    
+    # Computed fields
+    children = serializers.SerializerMethodField()
+    headcount_utilization = serializers.ReadOnlyField()
+    can_hire_more = serializers.ReadOnlyField()
+    
+    # Stats
+    active_recruiters_count = serializers.SerializerMethodField()
+    active_managers_count = serializers.SerializerMethodField()
+    active_budget_holders_count = serializers.SerializerMethodField()
+    active_budget_sponsors_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrganizationalUnit
+        fields = [
+            'id', 'name', 'type', 'parent', 'parent_name', 'code', 'description',
+            'full_path', 'location', 'location_name', 'cost_center',
+            'headcount_limit', 'current_headcount', 'headcount_utilization', 'can_hire_more',
+            
+            # Primary role assignments
+            'primary_recruiter', 'primary_recruiter_id',
+            'primary_manager', 'primary_manager_id',
+            'primary_budget_holder', 'primary_budget_holder_id',
+            'primary_budget_sponsor', 'primary_budget_sponsor_id',
+            
+            # Related assignments
+            'recruiters', 'managers', 'budget_holders', 'budget_sponsors',
+            'children',
+            
+            # Stats
+            'active_recruiters_count', 'active_managers_count',
+            'active_budget_holders_count', 'active_budget_sponsors_count',
+            
+            'is_active', 'created_at', 'updated_at', 'created_by'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'current_headcount']
+
+    def get_children(self, obj):
+        if obj.children.exists():
+            return OrganizationalUnitListSerializer(obj.children.filter(is_active=True), many=True, context=self.context).data
+        return []
+
+    def get_active_recruiters_count(self, obj):
+        return obj.recruiters.filter(is_active=True).count()
+
+    def get_active_managers_count(self, obj):
+        return obj.managers.filter(is_active=True).count()
+
+    def get_active_budget_holders_count(self, obj):
+        return obj.budget_holders.filter(is_active=True).count()
+
+    def get_active_budget_sponsors_count(self, obj):
+        return obj.budget_sponsors.filter(is_active=True).count()
+
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+        return super().create(validated_data)
+
+    def validate(self, data):
+        """Validate organizational hierarchy"""
+        parent = data.get('parent')
+        org_type = data.get('type')
+        
+        if parent:
+            if org_type == 'department':
+                raise serializers.ValidationError("Departments cannot have parents")
+            elif org_type == 'division' and parent.type != 'department':
+                raise serializers.ValidationError("Divisions can only belong to departments")
+            elif org_type == 'unit' and parent.type not in ['department', 'division']:
+                raise serializers.ValidationError("Units can only belong to departments or divisions")
+        
+        return data
+
+class OrganizationalUnitListSerializer(serializers.ModelSerializer):
+    """Simplified serializer for list views"""
+    parent_name = serializers.CharField(source='parent.name', read_only=True)
+    location_name = serializers.CharField(source='location.name', read_only=True)
+    
+    # Primary roles (just names)
+    primary_recruiter_name = serializers.CharField(source='primary_recruiter.get_full_name', read_only=True)
+    primary_manager_name = serializers.CharField(source='primary_manager.get_full_name', read_only=True)
+    primary_budget_holder_name = serializers.CharField(source='primary_budget_holder.get_full_name', read_only=True)
+    primary_budget_sponsor_name = serializers.CharField(source='primary_budget_sponsor.get_full_name', read_only=True)
+    
+    # Counts
+    children_count = serializers.SerializerMethodField()
+    total_roles_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrganizationalUnit
+        fields = [
+            'id', 'name', 'type', 'parent', 'parent_name', 'code',
+            'location_name', 'cost_center', 'headcount_limit', 'current_headcount',
+            'primary_recruiter_name', 'primary_manager_name',
+            'primary_budget_holder_name', 'primary_budget_sponsor_name',
+            'children_count', 'total_roles_count', 'is_active', 'created_at'
+        ]
+
+    def get_children_count(self, obj):
+        return obj.children.filter(is_active=True).count()
+
+    def get_total_roles_count(self, obj):
+        return (
+            obj.recruiters.filter(is_active=True).count() +
+            obj.managers.filter(is_active=True).count() +
+            obj.budget_holders.filter(is_active=True).count() +
+            obj.budget_sponsors.filter(is_active=True).count()
+        )
+
+class OrganizationalUnitCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating organizational units"""
+    
+    class Meta:
+        model = OrganizationalUnit
+        fields = [
+            'name', 'type', 'parent', 'code', 'description',
+            'location', 'cost_center', 'headcount_limit',
+            'primary_recruiter_id', 'primary_manager_id',
+            'primary_budget_holder_id', 'primary_budget_sponsor_id'
+        ]
+
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+        return super().create(validated_data)
+
+    def validate(self, data):
+        """Validate organizational hierarchy and business rules"""
+        parent = data.get('parent')
+        org_type = data.get('type')
+        
+        if parent:
+            if org_type == 'department':
+                raise serializers.ValidationError("Departments cannot have parents")
+            elif org_type == 'division' and parent.type != 'department':
+                raise serializers.ValidationError("Divisions can only belong to departments")
+            elif org_type == 'unit' and parent.type not in ['department', 'division']:
+                raise serializers.ValidationError("Units can only belong to departments or divisions")
+        
+        # Validate headcount limit
+        headcount_limit = data.get('headcount_limit')
+        if headcount_limit is not None and headcount_limit < 0:
+            raise serializers.ValidationError("Headcount limit cannot be negative")
+        
+        return data
+
+class RoleAssignmentBulkSerializer(serializers.Serializer):
+    """Serializer for bulk role assignments"""
+    organizational_unit_id = serializers.IntegerField()
+    role_type = serializers.ChoiceField(choices=['recruiter', 'manager', 'budget_holder', 'budget_sponsor'])
+    user_ids = serializers.ListField(child=serializers.IntegerField())
+    is_primary = serializers.BooleanField(default=False)
+    
+    # Role-specific fields
+    specialization = serializers.CharField(required=False, allow_blank=True)  # For recruiters
+    manager_type = serializers.ChoiceField(
+        choices=[('line_manager', 'Line Manager'), ('functional_manager', 'Functional Manager'), 
+                ('project_manager', 'Project Manager'), ('department_head', 'Department Head')],
+        required=False
+    )  # For managers
+    budget_limit = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)  # For budget holders
+    budget_type = serializers.ChoiceField(
+        choices=[('operational', 'Operational'), ('project', 'Project'), ('hiring', 'Hiring'), ('capex', 'CapEx')],
+        required=False
+    )  # For budget holders
+    approval_limit = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)  # For budget sponsors
+    sponsor_level = serializers.ChoiceField(
+        choices=[('level_1', 'Level 1'), ('level_2', 'Level 2'), ('level_3', 'Level 3'), ('executive', 'Executive')],
+        required=False
+    )  # For budget sponsors
+
+    def validate(self, data):
+        # Validate organizational unit exists
+        try:
+            OrganizationalUnit.objects.get(id=data['organizational_unit_id'])
+        except OrganizationalUnit.DoesNotExist:
+            raise serializers.ValidationError("Organizational unit does not exist")
+        
+        # Validate users exist
+        user_ids = data['user_ids']
+        existing_users = User.objects.filter(id__in=user_ids).count()
+        if existing_users != len(user_ids):
+            raise serializers.ValidationError("Some users do not exist")
+        
+        return data
+
+class OrganizationalUnitStatsSerializer(serializers.Serializer):
+    """Serializer for organizational unit statistics"""
+    total_units = serializers.IntegerField()
+    departments = serializers.IntegerField()
+    divisions = serializers.IntegerField()
+    units = serializers.IntegerField()
+    total_headcount = serializers.IntegerField()
+    average_headcount_utilization = serializers.FloatField()
+    units_over_capacity = serializers.IntegerField()
+    units_with_all_roles_assigned = serializers.IntegerField()
+    recent_updates = serializers.IntegerField()

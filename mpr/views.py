@@ -4,7 +4,8 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Avg
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from permissions.permissions import HasPermission
 from django.contrib.auth import get_user_model
@@ -16,7 +17,7 @@ from django.http import HttpResponse
 from .models import (
     Job, OrganizationalUnit, Location, EmploymentType, HiringReason,
     Employee, TechnicalSkill, Language, Competency, ContractDuration,
-    MPR, MPRComment, MPRStatusHistory
+    MPR, MPRComment, MPRStatusHistory, Recruiter, Manager, BudgetHolder, BudgetSponsor
 )
 from .serializers import (
     JobSerializer, OrganizationalUnitSerializer, LocationSerializer,
@@ -24,7 +25,10 @@ from .serializers import (
     TechnicalSkillSerializer, LanguageSerializer, CompetencySerializer,
     ContractDurationSerializer, MPRListSerializer, MPRDetailSerializer,
     MPRCreateSerializer, MPRCommentSerializer, MPRApprovalSerializer,
-    MPRStatusHistorySerializer
+    MPRStatusHistorySerializer,OrganizationalUnitListSerializer, OrganizationalUnitDetailSerializer,
+    OrganizationalUnitCreateSerializer, RecruiterSerializer, ManagerSerializer,
+    BudgetHolderSerializer, BudgetSponsorSerializer, RoleAssignmentBulkSerializer,
+    UserSerializer
 )
 from .filters import MPRFilter
 
@@ -83,56 +87,54 @@ class JobViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
         )
 
+# class OrganizationalUnitViewSet(viewsets.ReadOnlyModelViewSet):
+#     """ViewSet for organizational units (read-only)"""
+#     queryset = OrganizationalUnit.objects.filter(is_active=True)
+#     serializer_class = OrganizationalUnitSerializer
+#     permission_classes = [IsAuthenticated]
+#     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+#     search_fields = ['name', 'code']
+#     filterset_fields = ['type', 'parent']
+#     ordering = ['type', 'name']
 
-class OrganizationalUnitViewSet(viewsets.ReadOnlyModelViewSet):
-    """ViewSet for organizational units (read-only)"""
-    queryset = OrganizationalUnit.objects.filter(is_active=True)
-    serializer_class = OrganizationalUnitSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    search_fields = ['name', 'code']
-    filterset_fields = ['type', 'parent']
-    ordering = ['type', 'name']
+#     def get_permissions(self):
+#         """Dynamic permission based on action"""
+#         permission_map = {
+#             'list': 'mpr:view',
+#             'retrieve': 'mpr:view',
+#             'departments': 'mpr:view',
+#             'divisions': 'mpr:view',
+#             'units': 'mpr:view',
+#         }
+#         required_permission = permission_map.get(self.action, 'mpr:view')
+#         return [HasPermission(required_permission)]
 
-    def get_permissions(self):
-        """Dynamic permission based on action"""
-        permission_map = {
-            'list': 'mpr:view',
-            'retrieve': 'mpr:view',
-            'departments': 'mpr:view',
-            'divisions': 'mpr:view',
-            'units': 'mpr:view',
-        }
-        required_permission = permission_map.get(self.action, 'mpr:view')
-        return [HasPermission(required_permission)]
+#     @action(detail=False, methods=['get'], permission_classes=[HasPermission('mpr:view')])
+#     def departments(self, request):
+#         """Get all departments"""
+#         departments = self.queryset.filter(type='department')
+#         serializer = self.get_serializer(departments, many=True)
+#         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'], permission_classes=[HasPermission('mpr:view')])
-    def departments(self, request):
-        """Get all departments"""
-        departments = self.queryset.filter(type='department')
-        serializer = self.get_serializer(departments, many=True)
-        return Response(serializer.data)
+#     @action(detail=False, methods=['get'], permission_classes=[HasPermission('mpr:view')])
+#     def divisions(self, request):
+#         """Get divisions by department"""
+#         department_id = request.query_params.get('department')
+#         queryset = self.queryset.filter(type='division')
+#         if department_id:
+#             queryset = queryset.filter(parent_id=department_id)
+#         serializer = self.get_serializer(queryset, many=True)
+#         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'], permission_classes=[HasPermission('mpr:view')])
-    def divisions(self, request):
-        """Get divisions by department"""
-        department_id = request.query_params.get('department')
-        queryset = self.queryset.filter(type='division')
-        if department_id:
-            queryset = queryset.filter(parent_id=department_id)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
-    @action(detail=False, methods=['get'], permission_classes=[HasPermission('mpr:view')])
-    def units(self, request):
-        """Get units by department or division"""
-        parent_id = request.query_params.get('parent')
-        queryset = self.queryset.filter(type='unit')
-        if parent_id:
-            queryset = queryset.filter(parent_id=parent_id)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
+#     @action(detail=False, methods=['get'], permission_classes=[HasPermission('mpr:view')])
+#     def units(self, request):
+#         """Get units by department or division"""
+#         parent_id = request.query_params.get('parent')
+#         queryset = self.queryset.filter(type='unit')
+#         if parent_id:
+#             queryset = queryset.filter(parent_id=parent_id)
+#         serializer = self.get_serializer(queryset, many=True)
+#         return Response(serializer.data)
 
 class LocationViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for locations (read-only)"""
@@ -148,7 +150,6 @@ class LocationViewSet(viewsets.ReadOnlyModelViewSet):
         """Dynamic permission based on action"""
         return [HasPermission('mpr:view')]
 
-
 class EmploymentTypeViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for employment types (read-only)"""
     queryset = EmploymentType.objects.filter(is_active=True)
@@ -160,7 +161,6 @@ class EmploymentTypeViewSet(viewsets.ReadOnlyModelViewSet):
         """Dynamic permission based on action"""
         return [HasPermission('mpr:view')]
 
-
 class HiringReasonViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for hiring reasons (read-only)"""
     queryset = HiringReason.objects.filter(is_active=True)
@@ -171,7 +171,6 @@ class HiringReasonViewSet(viewsets.ReadOnlyModelViewSet):
     def get_permissions(self):
         """Dynamic permission based on action"""
         return [HasPermission('mpr:view')]
-
 
 class EmployeeViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for employees (read-only)"""
@@ -188,7 +187,6 @@ class EmployeeViewSet(viewsets.ReadOnlyModelViewSet):
     def get_permissions(self):
         """Dynamic permission based on action"""
         return [HasPermission('mpr:view')]
-
 
 class TechnicalSkillViewSet(viewsets.ModelViewSet):
     """ViewSet for technical skills"""
@@ -242,7 +240,6 @@ class TechnicalSkillViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
         )
 
-
 class LanguageViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for languages (read-only)"""
     queryset = Language.objects.filter(is_active=True)
@@ -253,7 +250,6 @@ class LanguageViewSet(viewsets.ReadOnlyModelViewSet):
     def get_permissions(self):
         """Dynamic permission based on action"""
         return [HasPermission('mpr:view')]
-
 
 class CompetencyViewSet(viewsets.ModelViewSet):
     """ViewSet for competencies"""
@@ -307,7 +303,6 @@ class CompetencyViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
         )
 
-
 class ContractDurationViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for contract durations (read-only)"""
     queryset = ContractDuration.objects.filter(is_active=True)
@@ -318,7 +313,6 @@ class ContractDurationViewSet(viewsets.ReadOnlyModelViewSet):
     def get_permissions(self):
         """Dynamic permission based on action"""
         return [HasPermission('mpr:view')]
-
 
 class MPRViewSet(viewsets.ModelViewSet):
     """ViewSet for MPR forms"""
@@ -579,3 +573,451 @@ class MPRViewSet(viewsets.ModelViewSet):
             ])
         
         return response
+
+# mpr/views.py (Additional views for organizational management)
+
+
+
+class OrganizationalUnitViewSet(viewsets.ModelViewSet):
+    """Enhanced ViewSet for organizational unit management"""
+    queryset = OrganizationalUnit.objects.select_related(
+        'parent', 'location', 'created_by',
+        'primary_recruiter', 'primary_manager', 
+        'primary_budget_holder', 'primary_budget_sponsor'
+    ).prefetch_related(
+        'children', 'recruiters__user', 'managers__user',
+        'budget_holders__user', 'budget_sponsors__user'
+    )
+    
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'code', 'description']
+    filterset_fields = ['type', 'parent', 'location', 'is_active']
+    ordering_fields = ['name', 'type', 'created_at', 'current_headcount']
+    ordering = ['type', 'name']
+
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action"""
+        if self.action == 'list':
+            return OrganizationalUnitListSerializer
+        elif self.action == 'create':
+            return OrganizationalUnitCreateSerializer
+        else:
+            return OrganizationalUnitDetailSerializer
+
+    def get_permissions(self):
+        """Dynamic permission based on action"""
+        permission_map = {
+            'list': 'mpr:view',
+            'retrieve': 'mpr:view',
+            'create': 'mpr:create',
+            'update': 'mpr:edit',
+            'partial_update': 'mpr:edit',
+            'destroy': 'mpr:delete',
+            'assign_role': 'mpr:edit',
+            'remove_role': 'mpr:edit',
+            'bulk_assign_roles': 'mpr:edit',
+            'update_primary_roles': 'mpr:edit',
+            'hierarchy': 'mpr:view',
+            'stats': 'mpr:view',
+            'headcount_report': 'mpr:view',
+        }
+        required_permission = permission_map.get(self.action, 'mpr:view')
+        return [HasPermission(required_permission)]
+
+    def get_queryset(self):
+        """Filter queryset based on user permissions and query params"""
+        queryset = super().get_queryset()
+        
+        # Filter by active status if not explicitly specified
+        if 'is_active' not in self.request.query_params:
+            queryset = queryset.filter(is_active=True)
+        
+        return queryset
+
+    @action(detail=True, methods=['post'])
+    def assign_role(self, request, pk=None):
+        """Assign a user to a specific role in this organizational unit"""
+        org_unit = self.get_object()
+        role_type = request.data.get('role_type')
+        user_id = request.data.get('user_id')
+        is_primary = request.data.get('is_primary', False)
+        
+        if not role_type or not user_id:
+            return Response(
+                {'error': 'role_type and user_id are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        role_models = {
+            'recruiter': Recruiter,
+            'manager': Manager,
+            'budget_holder': BudgetHolder,
+            'budget_sponsor': BudgetSponsor,
+        }
+        
+        if role_type not in role_models:
+            return Response(
+                {'error': 'Invalid role_type'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            with transaction.atomic():
+                # If setting as primary, unset other primary roles of same type
+                if is_primary:
+                    role_models[role_type].objects.filter(
+                        organizational_unit=org_unit,
+                        is_primary=True
+                    ).update(is_primary=False)
+                
+                # Create or update role assignment
+                role_data = {
+                    'user': user,
+                    'organizational_unit': org_unit,
+                    'is_primary': is_primary,
+                    'assigned_by': request.user
+                }
+                
+                # Add role-specific data
+                if role_type == 'recruiter':
+                    role_data['specialization'] = request.data.get('specialization', '')
+                elif role_type == 'manager':
+                    role_data['manager_type'] = request.data.get('manager_type', 'line_manager')
+                elif role_type == 'budget_holder':
+                    role_data['budget_limit'] = request.data.get('budget_limit')
+                    role_data['budget_type'] = request.data.get('budget_type', 'operational')
+                elif role_type == 'budget_sponsor':
+                    role_data['approval_limit'] = request.data.get('approval_limit')
+                    role_data['sponsor_level'] = request.data.get('sponsor_level', 'level_1')
+                
+                role_obj, created = role_models[role_type].objects.get_or_create(
+                    user=user,
+                    organizational_unit=org_unit,
+                    defaults=role_data
+                )
+                
+                if not created:
+                    # Update existing role
+                    for key, value in role_data.items():
+                        if key not in ['user', 'organizational_unit']:
+                            setattr(role_obj, key, value)
+                    role_obj.save()
+                
+                # Update primary role in organizational unit if needed
+                if is_primary:
+                    primary_field = f'primary_{role_type}'
+                    setattr(org_unit, primary_field, user)
+                    org_unit.save(update_fields=[primary_field])
+                
+                return Response({
+                    'message': f'User assigned as {role_type}',
+                    'created': created
+                }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+                
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=True, methods=['post'])
+    def remove_role(self, request, pk=None):
+        """Remove a user from a specific role in this organizational unit"""
+        org_unit = self.get_object()
+        role_type = request.data.get('role_type')
+        user_id = request.data.get('user_id')
+        
+        if not role_type or not user_id:
+            return Response(
+                {'error': 'role_type and user_id are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        role_models = {
+            'recruiter': Recruiter,
+            'manager': Manager,
+            'budget_holder': BudgetHolder,
+            'budget_sponsor': BudgetSponsor,
+        }
+        
+        if role_type not in role_models:
+            return Response(
+                {'error': 'Invalid role_type'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            with transaction.atomic():
+                role_obj = role_models[role_type].objects.get(
+                    user_id=user_id,
+                    organizational_unit=org_unit
+                )
+                
+                # If this was a primary role, clear it from org unit
+                if role_obj.is_primary:
+                    primary_field = f'primary_{role_type}'
+                    setattr(org_unit, primary_field, None)
+                    org_unit.save(update_fields=[primary_field])
+                
+                role_obj.delete()
+                
+                return Response({'message': f'User removed from {role_type} role'})
+                
+        except role_models[role_type].DoesNotExist:
+            return Response(
+                {'error': 'Role assignment not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=False, methods=['post'])
+    def bulk_assign_roles(self, request):
+        """Bulk assign roles to multiple users"""
+        serializer = RoleAssignmentBulkSerializer(data=request.data)
+        
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        data = serializer.validated_data
+        org_unit = OrganizationalUnit.objects.get(id=data['organizational_unit_id'])
+        role_type = data['role_type']
+        user_ids = data['user_ids']
+        
+        role_models = {
+            'recruiter': Recruiter,
+            'manager': Manager,
+            'budget_holder': BudgetHolder,
+            'budget_sponsor': BudgetSponsor,
+        }
+        
+        try:
+            with transaction.atomic():
+                created_count = 0
+                updated_count = 0
+                
+                for user_id in user_ids:
+                    user = User.objects.get(id=user_id)
+                    
+                    role_data = {
+                        'user': user,
+                        'organizational_unit': org_unit,
+                        'is_primary': data.get('is_primary', False),
+                        'assigned_by': request.user
+                    }
+                    
+                    # Add role-specific data
+                    if role_type == 'recruiter' and data.get('specialization'):
+                        role_data['specialization'] = data['specialization']
+                    elif role_type == 'manager' and data.get('manager_type'):
+                        role_data['manager_type'] = data['manager_type']
+                    elif role_type == 'budget_holder':
+                        if data.get('budget_limit'):
+                            role_data['budget_limit'] = data['budget_limit']
+                        if data.get('budget_type'):
+                            role_data['budget_type'] = data['budget_type']
+                    elif role_type == 'budget_sponsor':
+                        if data.get('approval_limit'):
+                            role_data['approval_limit'] = data['approval_limit']
+                        if data.get('sponsor_level'):
+                            role_data['sponsor_level'] = data['sponsor_level']
+                    
+                    role_obj, created = role_models[role_type].objects.get_or_create(
+                        user=user,
+                        organizational_unit=org_unit,
+                        defaults=role_data
+                    )
+                    
+                    if created:
+                        created_count += 1
+                    else:
+                        # Update existing role
+                        for key, value in role_data.items():
+                            if key not in ['user', 'organizational_unit']:
+                                setattr(role_obj, key, value)
+                        role_obj.save()
+                        updated_count += 1
+                
+                return Response({
+                    'message': f'Bulk assignment completed',
+                    'created': created_count,
+                    'updated': updated_count
+                })
+                
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=True, methods=['patch'])
+    def update_primary_roles(self, request, pk=None):
+        """Update primary role assignments for an organizational unit"""
+        org_unit = self.get_object()
+        
+        primary_fields = {
+            'primary_recruiter_id': 'primary_recruiter',
+            'primary_manager_id': 'primary_manager',
+            'primary_budget_holder_id': 'primary_budget_holder',
+            'primary_budget_sponsor_id': 'primary_budget_sponsor',
+        }
+        
+        updated_fields = []
+        
+        for field_id, field_name in primary_fields.items():
+            if field_id in request.data:
+                user_id = request.data[field_id]
+                
+                if user_id:
+                    try:
+                        user = User.objects.get(id=user_id)
+                        setattr(org_unit, field_name, user)
+                        updated_fields.append(field_name)
+                    except User.DoesNotExist:
+                        return Response(
+                            {'error': f'User with id {user_id} not found'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                else:
+                    setattr(org_unit, field_name, None)
+                    updated_fields.append(field_name)
+        
+        if updated_fields:
+            org_unit.save(update_fields=updated_fields)
+        
+        serializer = self.get_serializer(org_unit)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def hierarchy(self, request):
+        """Get organizational hierarchy tree"""
+        # Get root departments
+        departments = self.get_queryset().filter(type='department', parent=None)
+        
+        def build_tree(units):
+            result = []
+            for unit in units:
+                unit_data = OrganizationalUnitListSerializer(unit, context={'request': request}).data
+                children = unit.children.filter(is_active=True).order_by('name')
+                if children:
+                    unit_data['children'] = build_tree(children)
+                result.append(unit_data)
+            return result
+        
+        tree = build_tree(departments)
+        return Response(tree)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get organizational unit statistics"""
+        queryset = self.get_queryset()
+        
+        stats = {
+            'total_units': queryset.count(),
+            'departments': queryset.filter(type='department').count(),
+            'divisions': queryset.filter(type='division').count(),
+            'units': queryset.filter(type='unit').count(),
+            'total_headcount': sum(unit.current_headcount for unit in queryset),
+            'units_over_capacity': queryset.filter(
+                current_headcount__gt=models.F('headcount_limit'),
+                headcount_limit__isnull=False
+            ).count(),
+            'units_with_all_roles_assigned': queryset.filter(
+                primary_recruiter__isnull=False,
+                primary_manager__isnull=False,
+                primary_budget_holder__isnull=False,
+                primary_budget_sponsor__isnull=False
+            ).count(),
+            'recent_updates': queryset.filter(
+                updated_at__gte=timezone.now() - timedelta(days=7)
+            ).count(),
+        }
+        
+        # Calculate average headcount utilization
+        units_with_limits = queryset.filter(headcount_limit__isnull=False, headcount_limit__gt=0)
+        if units_with_limits:
+            total_utilization = sum(
+                (unit.current_headcount / unit.headcount_limit) * 100 
+                for unit in units_with_limits
+            )
+            stats['average_headcount_utilization'] = total_utilization / units_with_limits.count()
+        else:
+            stats['average_headcount_utilization'] = 0
+        
+        return Response(stats)
+
+    @action(detail=False, methods=['get'])
+    def headcount_report(self, request):
+        """Get detailed headcount report"""
+        queryset = self.get_queryset().filter(headcount_limit__isnull=False)
+        
+        report = []
+        for unit in queryset:
+            utilization = (unit.current_headcount / unit.headcount_limit) * 100 if unit.headcount_limit else 0
+            
+            report.append({
+                'id': unit.id,
+                'name': unit.name,
+                'type': unit.type,
+                'full_path': unit.get_full_path(),
+                'current_headcount': unit.current_headcount,
+                'headcount_limit': unit.headcount_limit,
+                'utilization_percentage': round(utilization, 2),
+                'available_positions': max(0, unit.headcount_limit - unit.current_headcount),
+                'over_capacity': unit.current_headcount > unit.headcount_limit,
+                'primary_manager': unit.primary_manager.get_full_name() if unit.primary_manager else None,
+            })
+        
+        # Sort by utilization percentage (highest first)
+        report.sort(key=lambda x: x['utilization_percentage'], reverse=True)
+        
+        return Response({
+            'report': report,
+            'summary': {
+                'total_units': len(report),
+                'over_capacity_units': len([r for r in report if r['over_capacity']]),
+                'high_utilization_units': len([r for r in report if r['utilization_percentage'] >= 90]),
+                'total_headcount': sum(r['current_headcount'] for r in report),
+                'total_capacity': sum(r['headcount_limit'] for r in report),
+                'available_positions': sum(r['available_positions'] for r in report),
+            }
+        })
+
+class RecruiterViewSet(viewsets.ModelViewSet):
+    queryset = Recruiter.objects.select_related('user', 'organizational_unit', 'assigned_by')
+    serializer_class = RecruiterSerializer
+    permission_classes = [HasPermission('mpr:edit')]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['organizational_unit', 'is_primary', 'is_active']
+    search_fields = ['user__first_name', 'user__last_name', 'specialization']
+
+class ManagerViewSet(viewsets.ModelViewSet):
+    queryset = Manager.objects.select_related('user', 'organizational_unit', 'assigned_by')
+    serializer_class = ManagerSerializer
+    permission_classes = [HasPermission('mpr:edit')]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['organizational_unit', 'is_primary', 'manager_type', 'is_active']
+    search_fields = ['user__first_name', 'user__last_name']
+
+class BudgetHolderViewSet(viewsets.ModelViewSet):
+    queryset = BudgetHolder.objects.select_related('user', 'organizational_unit', 'assigned_by')
+    serializer_class = BudgetHolderSerializer
+    permission_classes = [HasPermission('mpr:edit')]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['organizational_unit', 'is_primary', 'budget_type', 'is_active']
+    search_fields = ['user__first_name', 'user__last_name']
+
+class BudgetSponsorViewSet(viewsets.ModelViewSet):
+    queryset = BudgetSponsor.objects.select_related('user', 'organizational_unit', 'assigned_by')
+    serializer_class = BudgetSponsorSerializer
+    permission_classes = [HasPermission('mpr:edit')]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['organizational_unit', 'is_primary', 'sponsor_level', 'is_active']
+    search_fields = ['user__first_name', 'user__last_name']

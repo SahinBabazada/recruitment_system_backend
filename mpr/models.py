@@ -3,6 +3,7 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.conf import settings
 
 User = get_user_model()
 
@@ -22,6 +23,98 @@ class Job(models.Model):
     def __str__(self):
         return self.title
 
+class Recruiter(models.Model):
+    """Recruiter role assignments"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='recruiter_roles')
+    organizational_unit = models.ForeignKey('OrganizationalUnit', on_delete=models.CASCADE, related_name='recruiters')
+    is_primary = models.BooleanField(default=False, help_text="Primary recruiter for this unit")
+    specialization = models.CharField(max_length=200, blank=True, help_text="e.g., Technical roles, Sales roles")
+    is_active = models.BooleanField(default=True)
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    assigned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_recruiters')
+
+    class Meta:
+        db_table = 'mpr_recruiters'
+        unique_together = ['user', 'organizational_unit']
+        ordering = ['-is_primary', 'user__first_name']
+
+    def __str__(self):
+        primary = " (Primary)" if self.is_primary else ""
+        return f"{self.user.get_full_name()} - {self.organizational_unit.name}{primary}"
+
+class Manager(models.Model):
+    """Manager role assignments"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='manager_roles')
+    organizational_unit = models.ForeignKey('OrganizationalUnit', on_delete=models.CASCADE, related_name='managers')
+    is_primary = models.BooleanField(default=False, help_text="Primary manager for this unit")
+    manager_type = models.CharField(max_length=50, choices=[
+        ('line_manager', 'Line Manager'),
+        ('functional_manager', 'Functional Manager'),
+        ('project_manager', 'Project Manager'),
+        ('department_head', 'Department Head'),
+    ], default='line_manager')
+    is_active = models.BooleanField(default=True)
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    assigned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_managers')
+
+    class Meta:
+        db_table = 'mpr_managers'
+        unique_together = ['user', 'organizational_unit']
+        ordering = ['-is_primary', 'user__first_name']
+
+    def __str__(self):
+        primary = " (Primary)" if self.is_primary else ""
+        return f"{self.user.get_full_name()} - {self.organizational_unit.name}{primary}"
+
+class BudgetHolder(models.Model):
+    """Budget holder role assignments"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='budget_holder_roles')
+    organizational_unit = models.ForeignKey('OrganizationalUnit', on_delete=models.CASCADE, related_name='budget_holders')
+    is_primary = models.BooleanField(default=False, help_text="Primary budget holder for this unit")
+    budget_limit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Budget limit in local currency")
+    budget_type = models.CharField(max_length=50, choices=[
+        ('operational', 'Operational Budget'),
+        ('project', 'Project Budget'),
+        ('hiring', 'Hiring Budget'),
+        ('capex', 'Capital Expenditure'),
+    ], default='operational')
+    is_active = models.BooleanField(default=True)
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    assigned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_budget_holders')
+
+    class Meta:
+        db_table = 'mpr_budget_holders'
+        unique_together = ['user', 'organizational_unit']
+        ordering = ['-is_primary', 'user__first_name']
+
+    def __str__(self):
+        primary = " (Primary)" if self.is_primary else ""
+        return f"{self.user.get_full_name()} - {self.organizational_unit.name}{primary}"
+
+class BudgetSponsor(models.Model):
+    """Budget sponsor role assignments"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='budget_sponsor_roles')
+    organizational_unit = models.ForeignKey('OrganizationalUnit', on_delete=models.CASCADE, related_name='budget_sponsors')
+    is_primary = models.BooleanField(default=False, help_text="Primary budget sponsor for this unit")
+    approval_limit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Maximum amount they can approve")
+    sponsor_level = models.CharField(max_length=50, choices=[
+        ('level_1', 'Level 1 (up to 10k)'),
+        ('level_2', 'Level 2 (up to 50k)'),
+        ('level_3', 'Level 3 (up to 100k)'),
+        ('executive', 'Executive (unlimited)'),
+    ], default='level_1')
+    is_active = models.BooleanField(default=True)
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    assigned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_budget_sponsors')
+
+    class Meta:
+        db_table = 'mpr_budget_sponsors'
+        unique_together = ['user', 'organizational_unit']
+        ordering = ['-is_primary', 'user__first_name']
+
+    def __str__(self):
+        primary = " (Primary)" if self.is_primary else ""
+        return f"{self.user.get_full_name()} - {self.organizational_unit.name}{primary}"
 
 class OrganizationalUnit(models.Model):
     """Hierarchical organizational structure (Department > Division > Unit)"""
@@ -36,9 +129,39 @@ class OrganizationalUnit(models.Model):
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
     code = models.CharField(max_length=20, unique=True, help_text="Unique organizational code")
     description = models.TextField(blank=True)
+    
+    # Role assignments (keeping for backward compatibility and easy access)
+    primary_recruiter = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, 
+        related_name='primary_recruiter_units',
+        help_text="Primary recruiter for this organizational unit"
+    )
+    primary_manager = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='primary_manager_units',
+        help_text="Primary manager for this organizational unit"
+    )
+    primary_budget_holder = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='primary_budget_holder_units',
+        help_text="Primary budget holder for this organizational unit"
+    )
+    primary_budget_sponsor = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='primary_budget_sponsor_units',
+        help_text="Primary budget sponsor for this organizational unit"
+    )
+    
+    # Additional organizational metadata
+    cost_center = models.CharField(max_length=50, blank=True, help_text="Cost center code")
+    location = models.ForeignKey('Location', on_delete=models.SET_NULL, null=True, blank=True)
+    headcount_limit = models.IntegerField(null=True, blank=True, help_text="Maximum number of employees")
+    current_headcount = models.IntegerField(default=0, help_text="Current number of employees")
+    
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_org_units')
 
     class Meta:
         db_table = 'mpr_organizational_units'
@@ -66,6 +189,44 @@ class OrganizationalUnit(models.Model):
             return f"{self.parent.get_full_path()} > {self.name}"
         return self.name
 
+    def get_all_recruiters(self):
+        """Get all recruiters assigned to this unit"""
+        return self.recruiters.filter(is_active=True).select_related('user')
+
+    def get_all_managers(self):
+        """Get all managers assigned to this unit"""
+        return self.managers.filter(is_active=True).select_related('user')
+
+    def get_all_budget_holders(self):
+        """Get all budget holders assigned to this unit"""
+        return self.budget_holders.filter(is_active=True).select_related('user')
+
+    def get_all_budget_sponsors(self):
+        """Get all budget sponsors assigned to this unit"""
+        return self.budget_sponsors.filter(is_active=True).select_related('user')
+
+    def update_headcount(self):
+        """Update current headcount based on active employees"""
+        from .models import Employee
+        self.current_headcount = Employee.objects.filter(
+            department=self,
+            is_active=True
+        ).count()
+        self.save(update_fields=['current_headcount'])
+
+    @property
+    def headcount_utilization(self):
+        """Calculate headcount utilization percentage"""
+        if not self.headcount_limit:
+            return None
+        return (self.current_headcount / self.headcount_limit) * 100
+
+    @property
+    def can_hire_more(self):
+        """Check if unit can hire more people"""
+        if not self.headcount_limit:
+            return True
+        return self.current_headcount < self.headcount_limit
 
 class Location(models.Model):
     """Work locations"""
@@ -91,7 +252,6 @@ class Location(models.Model):
     def __str__(self):
         return self.name
 
-
 class EmploymentType(models.Model):
     """Types of employment"""
     name = models.CharField(max_length=100, unique=True)
@@ -108,7 +268,6 @@ class EmploymentType(models.Model):
     def __str__(self):
         return self.name
 
-
 class HiringReason(models.Model):
     """Reasons for hiring"""
     name = models.CharField(max_length=100, unique=True)
@@ -124,7 +283,6 @@ class HiringReason(models.Model):
 
     def __str__(self):
         return self.name
-
 
 class Employee(models.Model):
     """Employee records (simplified for now)"""
@@ -152,6 +310,11 @@ class Employee(models.Model):
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Update department headcount when employee is saved
+        if self.department:
+            self.department.update_headcount()
 
 class TechnicalSkill(models.Model):
     """Technical skills that can be required for positions"""
@@ -170,7 +333,6 @@ class TechnicalSkill(models.Model):
     def __str__(self):
         return self.name
 
-
 class Language(models.Model):
     """Languages that can be required for positions"""
     name = models.CharField(max_length=100, unique=True)
@@ -185,7 +347,6 @@ class Language(models.Model):
 
     def __str__(self):
         return self.name
-
 
 class Competency(models.Model):
     """Core competencies that can be required for positions"""
@@ -205,7 +366,6 @@ class Competency(models.Model):
     def __str__(self):
         return self.name
 
-
 class ContractDuration(models.Model):
     """Contract duration options"""
     name = models.CharField(max_length=100, unique=True)
@@ -222,7 +382,6 @@ class ContractDuration(models.Model):
 
     def __str__(self):
         return self.name
-
 
 class MPR(models.Model):
     """Manpower Requisition Form"""
@@ -359,7 +518,6 @@ class MPR(models.Model):
         if save:
             self.save(update_fields=['status', 'rejected_by', 'rejected_at', 'rejection_reason'])
 
-
 class MPRComment(models.Model):
     """Comments on MPR forms"""
     mpr = models.ForeignKey(MPR, on_delete=models.CASCADE, related_name='comments')
@@ -375,7 +533,6 @@ class MPRComment(models.Model):
 
     def __str__(self):
         return f"Comment on {self.mpr.mpr_number} by {self.user.username}"
-
 
 class MPRStatusHistory(models.Model):
     """Track status changes of MPR forms"""
