@@ -130,7 +130,100 @@ class InterviewViewSet(viewsets.ModelViewSet):
             )
         
         return queryset
-    
+        
+    #Add this action to your InterviewViewSet in views.py
+    @action(detail=False, methods=['get'])
+    def dashboard_stats(self, request):
+        """Get dashboard statistics for interviews"""
+        from django.db.models import Count, Avg, Q
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # Get date ranges
+        today = timezone.now().date()
+        week_ago = today - timedelta(days=7)
+        month_ago = today - timedelta(days=30)
+        
+        # Base queryset
+        interviews = Interview.objects.all()
+        
+        # Basic counts
+        total_interviews = interviews.count()
+        completed_interviews = interviews.filter(status='completed').count()
+        upcoming_interviews = interviews.filter(
+            scheduled_date__gte=timezone.now(),
+            status__in=['scheduled', 'confirmed']
+        ).count()
+        
+        # Recent activity
+        recent_interviews = interviews.filter(
+            created_at__gte=week_ago
+        ).count()
+        
+        # Status distribution
+        status_distribution = {}
+        for status_choice, label in Interview.STATUS_CHOICES:
+            count = interviews.filter(status=status_choice).count()
+            status_distribution[status_choice] = {
+                'label': label,
+                'count': count,
+                'percentage': round((count / total_interviews * 100), 2) if total_interviews > 0 else 0
+            }
+        
+        # Recommendation distribution (for completed interviews)
+        recommendation_distribution = {}
+        completed = interviews.filter(status='completed')
+        completed_count = completed.count()
+        
+        if completed_count > 0:
+            for rec_choice, label in Interview.RECOMMENDATION_CHOICES:
+                count = completed.filter(recommendation=rec_choice).count()
+                recommendation_distribution[rec_choice] = {
+                    'label': label,
+                    'count': count,
+                    'percentage': round((count / completed_count * 100), 2) if completed_count > 0 else 0
+                }
+        
+        # Average scores
+        avg_score = completed.aggregate(avg=Avg('overall_score'))['avg']
+        
+        # Interviews by round
+        round_stats = interviews.values(
+            'interview_round__name'
+        ).annotate(
+            count=Count('id'),
+            completed=Count('id', filter=Q(status='completed')),
+            avg_score=Avg('overall_score', filter=Q(status='completed'))
+        ).order_by('-count')
+        
+        # This week's activity
+        this_week = interviews.filter(
+            scheduled_date__gte=week_ago,
+            scheduled_date__lte=today + timedelta(days=1)
+        )
+        
+        week_stats = {
+            'scheduled': this_week.filter(status__in=['scheduled', 'confirmed']).count(),
+            'completed': this_week.filter(status='completed').count(),
+            'cancelled': this_week.filter(status='cancelled').count(),
+        }
+        
+        stats = {
+            'total_interviews': total_interviews,
+            'completed_interviews': completed_interviews,
+            'upcoming_interviews': upcoming_interviews,
+            'recent_interviews': recent_interviews,
+            'completion_rate': round((completed_interviews / total_interviews * 100), 2) if total_interviews > 0 else 0,
+            'average_score': round(avg_score, 2) if avg_score else None,
+            'status_distribution': status_distribution,
+            'recommendation_distribution': recommendation_distribution,
+            'round_statistics': list(round_stats),
+            'week_activity': week_stats,
+            'generated_at': timezone.now()
+        }
+        
+        return Response(stats)
+
     @action(detail=True, methods=['post'])
     def update_status(self, request, pk=None):
         """Update interview status"""

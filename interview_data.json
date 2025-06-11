@@ -1,0 +1,124 @@
+{
+  "candidates": {
+    "CAND001": {
+      "id": "CAND001",
+      "first_name": "John",
+      "last_name": "Doe",
+      "full_name": "John Doe",
+      "contact": {
+        "email": "john.doe@email.com",
+        "phone": "555-0123",
+        "linkedin": null,
+        "address": null
+      },
+      "position_applied": "Software Engineer",
+      "resume_path": null,
+      "status": "applied",
+      "application_date": "2025-06-11",
+      "skills": [
+        "Python",
+        "JavaScript",
+        "React",
+        "SQL"
+      ],
+      "experience_years": 3,
+      "education": [],
+      "notes": ""
+    },
+    "CAND002": {
+      "id": "CAND002",
+      "first_name": "Jane",
+      "last_name": "Smith",
+      "full_name": "Jane Smith",
+      "contact": {
+        "email": "jane.smith@email.com",
+        "phone": "555-0456",
+        "linkedin": null,
+        "address": null
+      },
+      "position_applied": "Data Scientist",
+      "resume_path": null,
+      "status": "applied",
+      "application_date": "2025-06-11",
+      "skills": [
+        "Python",
+        "Machine Learning",
+        "SQL",
+        "Pandas"
+      ],
+      "experience_years": 5,
+      "education": [],
+      "notes": ""
+    }
+  },
+  "interviewers": {
+    "INT001": {
+      "id": "INT001",
+      "name": "Alice Johnson",
+      "email": "alice.johnson@company.com",
+      "department": "Engineering",
+      "title": "Senior Software Engineer",
+      "phone": null,
+      "specializations": [
+        "Python",
+        "System Design"
+      ]
+    },
+    "INT002": {
+      "id": "INT002",
+      "name": "Bob Wilson",
+      "email": "bob.wilson@company.com",
+      "department": "Data Science",
+      "title": "Lead Data Scientist",
+      "phone": null,
+      "specializations": [
+        "Machine Learning",
+        "Statistics"
+      ]
+    }
+  },
+  "interviews": {
+    "INT_001": {
+      "id": "INT_001",
+      "candidate_id": "CAND001",
+      "interviewer_ids": [
+        "INT001"
+      ],
+      "interview_type": "technical",
+      "scheduled_datetime": "2025-06-15T10:00:00",
+      "duration_minutes": 60,
+      "status": "scheduled",
+      "location": "Conference Room A",
+      "meeting_link": null,
+      "notes": "",
+      "feedback": {},
+      "score": null
+    }
+  },
+  "questions": {
+    "Q001": {
+      "id": "Q001",
+      "question_text": "Explain the difference between a list and a dictionary in Python.",
+      "category": "technical",
+      "difficulty_level": "easy",
+      "expected_answer": null,
+      "follow_up_questions": [],
+      "tags": [
+        "python",
+        "data-structures"
+      ]
+    },
+    "Q002": {
+      "id": "Q002",
+      "question_text": "Describe a challenging project you worked on and how you overcame obstacles.",
+      "category": "behavioral",
+      "difficulty_level": "medium",
+      "expected_answer": null,
+      "follow_up_questions": [],
+      "tags": [
+        "problem-solving",
+        "teamwork"
+      ]
+    }
+  }
+}

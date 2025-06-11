@@ -528,7 +528,7 @@ class CandidateCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Candidate
         fields = [
-            'email', 'name', 'phone', 'alternative_phone', 'location',
+            'id','email', 'name', 'phone', 'alternative_phone', 'location',
             'address', 'date_of_birth', 'nationality', 'current_position',
             'current_company', 'professional_summary', 'experience_years',
             'professional_skills', 'technical_skills', 'soft_skills',

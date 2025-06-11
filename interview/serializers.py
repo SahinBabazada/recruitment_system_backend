@@ -1,5 +1,7 @@
+# interview/serializers.py - COMPLETE FIXED VERSION
+
 from rest_framework import serializers
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from .models import (
     InterviewRound, Interview, InterviewParticipant, 
@@ -7,6 +9,9 @@ from .models import (
     InterviewQuestionResponse, InterviewReschedule,
     InterviewFeedbackTemplate, InterviewCalendarIntegration
 )
+
+# Use the correct User model for your project
+User = get_user_model()
 
 
 class UserBasicSerializer(serializers.ModelSerializer):
@@ -37,17 +42,19 @@ class InterviewRoundSerializer(serializers.ModelSerializer):
 
 
 class InterviewParticipantSerializer(serializers.ModelSerializer):
-    """Serializer for interview participants"""
-    user = UserBasicSerializer(read_only=True)
+    """Serializer for interview participants - SAFE VERSION"""
     user_id = serializers.IntegerField(write_only=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    user_username = serializers.CharField(source='user.username', read_only=True)
     
     class Meta:
         model = InterviewParticipant
         fields = [
-            'id', 'user', 'user_id', 'role', 'individual_score',
-            'individual_feedback', 'individual_recommendation', 'attended',
-            'joined_at', 'left_at', 'send_calendar_invite', 'send_reminders',
-            'created_at'
+            'id', 'user_id', 'user_name', 'user_email', 'user_username', 'role', 
+            'individual_score', 'individual_feedback', 'individual_recommendation', 
+            'attended', 'joined_at', 'left_at', 'send_calendar_invite', 
+            'send_reminders', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
     
@@ -60,13 +67,13 @@ class InterviewParticipantSerializer(serializers.ModelSerializer):
 
 class InterviewCriteriaEvaluationSerializer(serializers.ModelSerializer):
     """Serializer for criteria evaluations"""
-    participant = InterviewParticipantSerializer(read_only=True)
     participant_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    participant_name = serializers.CharField(source='participant.user.get_full_name', read_only=True)
     
     class Meta:
         model = InterviewCriteriaEvaluation
         fields = [
-            'id', 'participant', 'participant_id', 'criteria_name', 'score',
+            'id', 'participant_id', 'participant_name', 'criteria_name', 'score',
             'comments', 'weight', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
@@ -86,36 +93,36 @@ class InterviewCriteriaEvaluationSerializer(serializers.ModelSerializer):
 
 class InterviewQuestionSerializer(serializers.ModelSerializer):
     """Serializer for interview questions"""
-    interview_round = InterviewRoundSerializer(read_only=True)
     interview_round_id = serializers.IntegerField(write_only=True)
-    created_by = UserBasicSerializer(read_only=True)
+    interview_round_name = serializers.CharField(source='interview_round.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     usage_count = serializers.IntegerField(read_only=True)
     
     class Meta:
         model = InterviewQuestion
         fields = [
-            'id', 'interview_round', 'interview_round_id', 'question_text',
+            'id', 'interview_round_id', 'interview_round_name', 'question_text',
             'question_type', 'evaluation_criteria', 'difficulty_level',
             'estimated_time_minutes', 'is_active', 'usage_count',
             'follow_up_questions', 'ideal_answer_points', 'created_at',
-            'updated_at', 'created_by'
+            'updated_at', 'created_by', 'created_by_name'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'usage_count']
 
 
 class InterviewQuestionResponseSerializer(serializers.ModelSerializer):
     """Serializer for interview question responses"""
-    question = InterviewQuestionSerializer(read_only=True)
     question_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
-    asked_by = InterviewParticipantSerializer(read_only=True)
+    question_text = serializers.CharField(source='question.question_text', read_only=True)
     asked_by_id = serializers.IntegerField(write_only=True)
+    asked_by_name = serializers.CharField(source='asked_by.user.get_full_name', read_only=True)
     
     class Meta:
         model = InterviewQuestionResponse
         fields = [
-            'id', 'question', 'question_id', 'custom_question_text',
+            'id', 'question_id', 'question_text', 'custom_question_text',
             'candidate_answer', 'interviewer_notes', 'response_score',
-            'time_taken_minutes', 'asked_by', 'asked_by_id', 'created_at'
+            'time_taken_minutes', 'asked_by_id', 'asked_by_name', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
     
@@ -140,15 +147,15 @@ class InterviewQuestionResponseSerializer(serializers.ModelSerializer):
 
 class InterviewRescheduleSerializer(serializers.ModelSerializer):
     """Serializer for interview reschedules"""
-    initiated_by_user = UserBasicSerializer(read_only=True)
     initiated_by_user_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    initiated_by_user_name = serializers.CharField(source='initiated_by_user.get_full_name', read_only=True)
     
     class Meta:
         model = InterviewReschedule
         fields = [
             'id', 'previous_date', 'previous_location', 'new_date',
             'new_location', 'reason', 'reason_details', 'initiated_by_type',
-            'initiated_by_user', 'initiated_by_user_id', 'candidate_notified',
+            'initiated_by_user_id', 'initiated_by_user_name', 'candidate_notified',
             'interviewers_notified', 'notification_sent_at', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
@@ -160,7 +167,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
     candidate_email = serializers.CharField(source='candidate.email', read_only=True)
     mpr_title = serializers.CharField(source='mpr.job_title.title', read_only=True)
     mpr_number = serializers.CharField(source='mpr.mpr_number', read_only=True)
-    interview_round = InterviewRoundSerializer(read_only=True)
+    interview_round_name = serializers.CharField(source='interview_round.name', read_only=True)
     participants_count = serializers.SerializerMethodField()
     is_upcoming = serializers.ReadOnlyField()
     is_overdue = serializers.ReadOnlyField()
@@ -170,8 +177,8 @@ class InterviewListSerializer(serializers.ModelSerializer):
         model = Interview
         fields = [
             'id', 'candidate', 'candidate_name', 'candidate_email', 'mpr',
-            'mpr_title', 'mpr_number', 'interview_round', 'title',
-            'scheduled_date', 'duration_minutes', 'location', 'status',
+            'mpr_title', 'mpr_number', 'interview_round', 'interview_round_name',
+            'title', 'scheduled_date', 'duration_minutes', 'location', 'status',
             'overall_score', 'recommendation', 'participants_count',
             'is_upcoming', 'is_overdue', 'actual_duration_minutes',
             'created_at'
@@ -184,17 +191,19 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
 
 class InterviewDetailSerializer(serializers.ModelSerializer):
-    """Detailed serializer for interview"""
+    """Detailed serializer for interview - SAFE VERSION"""
     candidate_name = serializers.CharField(source='candidate.name', read_only=True)
     candidate_email = serializers.CharField(source='candidate.email', read_only=True)
     mpr_title = serializers.CharField(source='mpr.job_title.title', read_only=True)
     mpr_number = serializers.CharField(source='mpr.mpr_number', read_only=True)
-    interview_round = InterviewRoundSerializer(read_only=True)
-    participants = InterviewParticipantSerializer(many=True, read_only=True)
-    criteria_evaluations = InterviewCriteriaEvaluationSerializer(many=True, read_only=True)
-    question_responses = InterviewQuestionResponseSerializer(many=True, read_only=True)
-    reschedule_history = InterviewRescheduleSerializer(many=True, read_only=True)
-    created_by = UserBasicSerializer(read_only=True)
+    interview_round_name = serializers.CharField(source='interview_round.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    
+    # Use SerializerMethodField for safe data retrieval
+    participants = serializers.SerializerMethodField()
+    criteria_evaluations = serializers.SerializerMethodField()
+    question_responses = serializers.SerializerMethodField()
+    reschedule_history = serializers.SerializerMethodField()
     
     # Computed fields
     is_upcoming = serializers.ReadOnlyField()
@@ -207,17 +216,100 @@ class InterviewDetailSerializer(serializers.ModelSerializer):
         model = Interview
         fields = [
             'id', 'candidate', 'candidate_name', 'candidate_email', 'mpr',
-            'mpr_title', 'mpr_number', 'interview_round', 'title',
-            'scheduled_date', 'duration_minutes', 'location', 'meeting_link',
-            'meeting_details', 'status', 'actual_start_time', 'actual_end_time',
-            'overall_score', 'strengths', 'weaknesses', 'general_feedback',
-            'recommendation', 'interviewer_notes', 'preparation_notes',
-            'created_at', 'updated_at', 'created_by', 'participants',
-            'criteria_evaluations', 'question_responses', 'reschedule_history',
-            'is_upcoming', 'is_overdue', 'actual_duration_minutes',
-            'can_be_rescheduled', 'can_be_cancelled'
+            'mpr_title', 'mpr_number', 'interview_round', 'interview_round_name',
+            'title', 'scheduled_date', 'duration_minutes', 'location', 
+            'meeting_link', 'meeting_details', 'status', 'actual_start_time', 
+            'actual_end_time', 'overall_score', 'strengths', 'weaknesses', 
+            'general_feedback', 'recommendation', 'interviewer_notes', 
+            'preparation_notes', 'participants', 'criteria_evaluations',
+            'question_responses', 'reschedule_history', 'is_upcoming', 
+            'is_overdue', 'actual_duration_minutes', 'can_be_rescheduled', 
+            'can_be_cancelled', 'created_at', 'updated_at', 'created_by', 
+            'created_by_name'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_participants(self, obj):
+        """Get participants safely"""
+        participants_data = []
+        for participant in obj.participants.select_related('user').all():
+            participants_data.append({
+                'id': participant.id,
+                'user_id': participant.user.id,
+                'user_name': participant.user.get_full_name(),
+                'user_email': participant.user.email,
+                'user_username': participant.user.username,
+                'role': participant.role,
+                'individual_score': float(participant.individual_score) if participant.individual_score else None,
+                'individual_feedback': participant.individual_feedback,
+                'individual_recommendation': participant.individual_recommendation,
+                'attended': participant.attended,
+                'joined_at': participant.joined_at,
+                'left_at': participant.left_at,
+                'send_calendar_invite': participant.send_calendar_invite,
+                'send_reminders': participant.send_reminders,
+                'created_at': participant.created_at,
+            })
+        return participants_data
+    
+    def get_criteria_evaluations(self, obj):
+        """Get criteria evaluations safely"""
+        evaluations_data = []
+        for evaluation in obj.criteria_evaluations.select_related('participant__user').all():
+            evaluations_data.append({
+                'id': evaluation.id,
+                'participant_id': evaluation.participant.id if evaluation.participant else None,
+                'participant_name': evaluation.participant.user.get_full_name() if evaluation.participant else 'Consolidated',
+                'criteria_name': evaluation.criteria_name,
+                'score': float(evaluation.score),
+                'comments': evaluation.comments,
+                'weight': float(evaluation.weight),
+                'created_at': evaluation.created_at,
+            })
+        return evaluations_data
+    
+    def get_question_responses(self, obj):
+        """Get question responses safely"""
+        responses_data = []
+        for response in obj.question_responses.select_related(
+            'question__interview_round', 'asked_by__user'
+        ).all():
+            responses_data.append({
+                'id': response.id,
+                'question_id': response.question.id if response.question else None,
+                'question_text': response.question.question_text if response.question else None,
+                'custom_question_text': response.custom_question_text,
+                'candidate_answer': response.candidate_answer,
+                'interviewer_notes': response.interviewer_notes,
+                'response_score': float(response.response_score) if response.response_score else None,
+                'time_taken_minutes': response.time_taken_minutes,
+                'asked_by_id': response.asked_by.id,
+                'asked_by_name': response.asked_by.user.get_full_name(),
+                'created_at': response.created_at,
+            })
+        return responses_data
+    
+    def get_reschedule_history(self, obj):
+        """Get reschedule history safely"""
+        reschedules_data = []
+        for reschedule in obj.reschedule_history.select_related('initiated_by_user').all():
+            reschedules_data.append({
+                'id': reschedule.id,
+                'previous_date': reschedule.previous_date,
+                'previous_location': reschedule.previous_location,
+                'new_date': reschedule.new_date,
+                'new_location': reschedule.new_location,
+                'reason': reschedule.reason,
+                'reason_details': reschedule.reason_details,
+                'initiated_by_type': reschedule.initiated_by_type,
+                'initiated_by_user_id': reschedule.initiated_by_user.id if reschedule.initiated_by_user else None,
+                'initiated_by_user_name': reschedule.initiated_by_user.get_full_name() if reschedule.initiated_by_user else None,
+                'candidate_notified': reschedule.candidate_notified,
+                'interviewers_notified': reschedule.interviewers_notified,
+                'notification_sent_at': reschedule.notification_sent_at,
+                'created_at': reschedule.created_at,
+            })
+        return reschedules_data
     
     def get_can_be_rescheduled(self, obj):
         """Check if interview can be rescheduled"""
@@ -229,34 +321,29 @@ class InterviewDetailSerializer(serializers.ModelSerializer):
 
 
 class InterviewCreateUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for creating and updating interviews"""
+    """Serializer for creating/updating interviews"""
     participants_data = serializers.ListField(
         child=serializers.DictField(),
         write_only=True,
-        required=False,
-        help_text="List of participant data with user_id and role"
+        required=False
     )
     
     class Meta:
         model = Interview
         fields = [
-            'candidate', 'mpr', 'interview_round', 'title', 'scheduled_date',
-            'duration_minutes', 'location', 'meeting_link', 'meeting_details',
-            'status', 'actual_start_time', 'actual_end_time', 'overall_score',
-            'strengths', 'weaknesses', 'general_feedback', 'recommendation',
-            'interviewer_notes', 'preparation_notes', 'participants_data'
+            'id', 'candidate', 'mpr', 'interview_round', 'title',
+            'scheduled_date', 'duration_minutes', 'location', 'meeting_link',
+            'meeting_details', 'status', 'actual_start_time', 'actual_end_time',
+            'overall_score', 'strengths', 'weaknesses', 'general_feedback',
+            'recommendation', 'interviewer_notes', 'preparation_notes',
+            'participants_data'
         ]
-    
-    def validate_overall_score(self, value):
-        """Validate overall score range"""
-        if value is not None and (value < 0.0 or value > 5.0):
-            raise serializers.ValidationError("Overall score must be between 0.0 and 5.0.")
-        return value
+        read_only_fields = ['id']
     
     def validate_scheduled_date(self, value):
-        """Validate scheduled date is in the future for new interviews"""
-        if value and not self.instance and value < timezone.now():
-            raise serializers.ValidationError("Scheduled date must be in the future.")
+        """Validate scheduled date"""
+        if value and value < timezone.now():
+            raise serializers.ValidationError("Scheduled date cannot be in the past.")
         return value
     
     def validate_actual_times(self, attrs):
@@ -320,16 +407,16 @@ class InterviewCreateUpdateSerializer(serializers.ModelSerializer):
 
 class InterviewFeedbackTemplateSerializer(serializers.ModelSerializer):
     """Serializer for interview feedback templates"""
-    interview_round = InterviewRoundSerializer(read_only=True)
     interview_round_id = serializers.IntegerField(write_only=True)
-    created_by = UserBasicSerializer(read_only=True)
+    interview_round_name = serializers.CharField(source='interview_round.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     
     class Meta:
         model = InterviewFeedbackTemplate
         fields = [
-            'id', 'interview_round', 'interview_round_id', 'name',
+            'id', 'interview_round_id', 'interview_round_name', 'name',
             'description', 'sections', 'is_default', 'is_active',
-            'created_at', 'updated_at', 'created_by'
+            'created_at', 'updated_at', 'created_by', 'created_by_name'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
     
@@ -342,18 +429,13 @@ class InterviewFeedbackTemplateSerializer(serializers.ModelSerializer):
             if not isinstance(section, dict):
                 raise serializers.ValidationError("Each section must be a dictionary.")
             
-            required_fields = ['name', 'weight', 'fields']
+            required_fields = ['name', 'fields']
             for field in required_fields:
                 if field not in section:
-                    raise serializers.ValidationError(f"Section must contain '{field}' field.")
+                    raise serializers.ValidationError(f"Section must contain '{field}'.")
             
-            # Validate weight
-            weight = section.get('weight')
-            if not isinstance(weight, (int, float)) or weight < 0 or weight > 1:
-                raise serializers.ValidationError("Section weight must be between 0 and 1.")
-            
-            # Validate fields
-            fields = section.get('fields')
+            # Validate fields within section
+            fields = section.get('fields', [])
             if not isinstance(fields, list):
                 raise serializers.ValidationError("Section fields must be a list.")
             
@@ -435,48 +517,27 @@ class InterviewStatusUpdateSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     "Completed interviews must have actual start and end times."
                 )
-            
-            if start_time >= end_time:
-                raise serializers.ValidationError(
-                    "Actual end time must be after actual start time."
-                )
+        
+        # Validate time sequence
+        if start_time and end_time and start_time >= end_time:
+            raise serializers.ValidationError(
+                "End time must be after start time."
+            )
         
         return attrs
 
 
-class InterviewParticipantFeedbackSerializer(serializers.Serializer):
+class InterviewParticipantFeedbackSerializer(serializers.ModelSerializer):
     """Serializer for participant feedback submission"""
-    individual_score = serializers.DecimalField(
-        max_digits=3, 
-        decimal_places=1, 
-        min_value=0.0, 
-        max_value=5.0,
-        required=False,
-        allow_null=True
-    )
-    individual_feedback = serializers.CharField(required=False, allow_blank=True)
-    individual_recommendation = serializers.ChoiceField(
-        choices=Interview.RECOMMENDATION_CHOICES,
-        required=False,
-        allow_null=True
-    )
-    criteria_evaluations = serializers.ListField(
-        child=serializers.DictField(),
-        required=False,
-        help_text="List of criteria evaluations with criteria_name, score, comments, weight"
-    )
     
-    def validate_criteria_evaluations(self, value):
-        """Validate criteria evaluations structure"""
-        for evaluation in value:
-            if 'criteria_name' not in evaluation:
-                raise serializers.ValidationError("Each evaluation must have criteria_name.")
-            
-            if 'score' not in evaluation:
-                raise serializers.ValidationError("Each evaluation must have score.")
-            
-            score = evaluation['score']
-            if not isinstance(score, (int, float)) or score < 0 or score > 5:
-                raise serializers.ValidationError("Score must be between 0 and 5.")
-        
+    class Meta:
+        model = InterviewParticipant
+        fields = [
+            'individual_score', 'individual_feedback', 'individual_recommendation'
+        ]
+    
+    def validate_individual_score(self, value):
+        """Validate individual score range"""
+        if value is not None and (value < 0.0 or value > 5.0):
+            raise serializers.ValidationError("Individual score must be between 0.0 and 5.0.")
         return value
