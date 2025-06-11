@@ -1,0 +1,17 @@
+<!-- candidate/templates/candidate/emails/rejection.txt -->
+Application Update
+
+Dear {{ candidate.name }},
+
+Thank you for your interest in joining our team and for the time you invested in our recruitment process.
+
+After careful consideration, we have decided to move forward with other candidates whose qualifications more closely align with our current needs for this position.
+
+This decision does not reflect on your qualifications or potential. We were impressed with your background and encourage you to apply for future opportunities that may be a better fit.
+
+We will keep your profile in our talent database and may reach out if a suitable position becomes available.
+
+Thank you again for considering us as your potential employer. We wish you all the best in your job search.
+
+Best regards,
+{{ sender.get_full_name|default:"Recruitment Team" }}

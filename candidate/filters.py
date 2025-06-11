@@ -1,101 +1,13 @@
+# candidate/filters.py
 import django_filters
-from django.db.models import Q
-from .models import Candidate, CandidateEmail, EmailAttachment, CandidateMPR
+from django.db import models
+from django.contrib.auth import get_user_model
+from .models import Candidate, CandidateMPR
+
+User = get_user_model()
 
 
-class CandidateMPRFilter(django_filters.FilterSet):
-    """Filter set for CandidateMPR model"""
-    
-    application_stage = django_filters.ChoiceFilter(
-        choices=CandidateMPR._meta.get_field('application_stage').choices,
-        label='Application Stage'
-    )
-    
-    application_stage__in = django_filters.MultipleChoiceFilter(
-        field_name='application_stage',
-        choices=CandidateMPR._meta.get_field('application_stage').choices,
-        label='Application Stage (Multiple)'
-    )
-    
-    mpr_status = django_filters.CharFilter(
-        field_name='mpr__status',
-        label='MPR Status'
-    )
-    
-    technical_fit_score__gte = django_filters.NumberFilter(
-        field_name='technical_fit_score',
-        lookup_expr='gte',
-        label='Technical Fit Score (Min)'
-    )
-    technical_fit_score__lte = django_filters.NumberFilter(
-        field_name='technical_fit_score',
-        lookup_expr='lte',
-        label='Technical Fit Score (Max)'
-    )
-    
-    cultural_fit_score__gte = django_filters.NumberFilter(
-        field_name='cultural_fit_score',
-        lookup_expr='gte',
-        label='Cultural Fit Score (Min)'
-    )
-    cultural_fit_score__lte = django_filters.NumberFilter(
-        field_name='cultural_fit_score',
-        lookup_expr='lte',
-        label='Cultural Fit Score (Max)'
-    )
-    
-    applied_after = django_filters.DateTimeFilter(
-        field_name='applied_at',
-        lookup_expr='gte',
-        label='Applied After'
-    )
-    applied_before = django_filters.DateTimeFilter(
-        field_name='applied_at',
-        lookup_expr='lte',
-        label='Applied Before'
-    )
-    
-    has_primary_cv = django_filters.BooleanFilter(
-        method='filter_has_primary_cv',
-        label='Has Primary CV'
-    )
-    
-    mpr_job_title__icontains = django_filters.CharFilter(
-        field_name='mpr__job_title__title',
-        lookup_expr='icontains',
-        label='Job Title Contains'
-    )
-    
-    mpr_department = django_filters.NumberFilter(
-        field_name='mpr__department',
-        label='MPR Department ID'
-    )
-    
-    updated_by = django_filters.ModelChoiceFilter(
-        field_name='updated_by',
-        queryset=None,  # Will be set in __init__
-        label='Updated By'
-    )
-    
-    class Meta:
-        model = CandidateMPR
-        fields = []
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Set the queryset for updated_by filter
-        from django.contrib.auth.models import User
-        self.filters['updated_by'].queryset = User.objects.filter(
-            updated_candidate_mprs__isnull=False
-        ).distinct()
-    
-    def filter_has_primary_cv(self, queryset, name, value):
-        """Filter applications with or without primary CV"""
-        if value is True:
-            return queryset.filter(primary_cv__isnull=False)
-        elif value is False:
-            return queryset.filter(primary_cv__isnull=True)
-        return querysetandidateFilter(django_filters.FilterSet):
+class CandidateFilter(django_filters.FilterSet):
     """Filter set for Candidate model"""
     
     # Text search across multiple fields
@@ -191,6 +103,25 @@ class CandidateMPRFilter(django_filters.FilterSet):
         label='Has Professional Skill'
     )
     
+    # Technical skills filter
+    technical_skills__contains = django_filters.CharFilter(
+        method='filter_technical_skills',
+        label='Has Technical Skill'
+    )
+    
+    # Languages filter
+    languages__contains = django_filters.CharFilter(
+        method='filter_languages',
+        label='Speaks Language'
+    )
+    
+    # Nationality filter
+    nationality = django_filters.CharFilter(
+        field_name='nationality',
+        lookup_expr='iexact',
+        label='Nationality'
+    )
+    
     # Relationship filters
     has_interviews = django_filters.BooleanFilter(
         method='filter_has_interviews',
@@ -211,6 +142,18 @@ class CandidateMPRFilter(django_filters.FilterSet):
     has_primary_cv = django_filters.BooleanFilter(
         method='filter_has_primary_cv',
         label='Has Primary CV'
+    )
+    has_work_experience = django_filters.BooleanFilter(
+        method='filter_has_work_experience',
+        label='Has Work Experience'
+    )
+    has_education = django_filters.BooleanFilter(
+        method='filter_has_education',
+        label='Has Education History'
+    )
+    has_projects = django_filters.BooleanFilter(
+        method='filter_has_projects',
+        label='Has Projects'
     )
     
     # MPR application filters
@@ -235,17 +178,29 @@ class CandidateMPRFilter(django_filters.FilterSet):
         lookup_expr='lte',
         label='Salary Expectation (Max)'
     )
-    
-    # Availability filter
-    available_after = django_filters.DateFilter(
-        field_name='availability_date',
-        lookup_expr='gte',
-        label='Available After'
+    salary_currency = django_filters.CharFilter(
+        field_name='salary_currency',
+        lookup_expr='iexact',
+        label='Salary Currency'
     )
-    available_before = django_filters.DateFilter(
+    
+    # Availability filters
+    available_from = django_filters.DateFilter(
         field_name='availability_date',
         lookup_expr='lte',
-        label='Available Before'
+        label='Available From (Before)'
+    )
+    available_until = django_filters.DateFilter(
+        field_name='availability_date',
+        lookup_expr='gte',
+        label='Available Until (After)'
+    )
+    
+    # Notice period filter
+    notice_period_days__lte = django_filters.NumberFilter(
+        field_name='notice_period_days',
+        lookup_expr='lte',
+        label='Notice Period (Max Days)'
     )
     
     class Meta:
@@ -257,14 +212,14 @@ class CandidateMPRFilter(django_filters.FilterSet):
         if not value:
             return queryset
         
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(email__icontains=value) |
-            Q(current_position__icontains=value) |
-            Q(current_company__icontains=value) |
-            Q(location__icontains=value) |
-            Q(internal_notes__icontains=value)
-        )
+        search_query = models.Q(name__icontains=value) | \
+                      models.Q(email__icontains=value) | \
+                      models.Q(phone__icontains=value) | \
+                      models.Q(current_position__icontains=value) | \
+                      models.Q(current_company__icontains=value) | \
+                      models.Q(location__icontains=value)
+        
+        return queryset.filter(search_query).distinct()
     
     def filter_has_score(self, queryset, name, value):
         """Filter candidates with or without overall score"""
@@ -275,11 +230,22 @@ class CandidateMPRFilter(django_filters.FilterSet):
         return queryset
     
     def filter_professional_skills(self, queryset, name, value):
-        """Filter by professional skills (JSON field)"""
+        """Filter by professional skills"""
         if not value:
             return queryset
-        
-        return queryset.filter(professional_skills__contains=[value])
+        return queryset.filter(professional_skills__icontains=value)
+    
+    def filter_technical_skills(self, queryset, name, value):
+        """Filter by technical skills"""
+        if not value:
+            return queryset
+        return queryset.filter(technical_skills__icontains=value)
+    
+    def filter_languages(self, queryset, name, value):
+        """Filter by languages"""
+        if not value:
+            return queryset
+        return queryset.filter(languages__icontains=value)
     
     def filter_has_interviews(self, queryset, name, value):
         """Filter candidates with or without interviews"""
@@ -324,123 +290,102 @@ class CandidateMPRFilter(django_filters.FilterSet):
         elif value is False:
             return queryset.exclude(attachments__is_primary_cv=True)
         return queryset
-
-
-class CandidateEmailFilter(django_filters.FilterSet):
-    """Filter set for CandidateEmail model"""
     
-    search = django_filters.CharFilter(method='filter_search', label='Search')
-    
-    email_type = django_filters.ChoiceFilter(
-        choices=CandidateEmail._meta.get_field('email_type').choices,
-        label='Email Type'
-    )
-    
-    is_inbound = django_filters.BooleanFilter(label='Is Inbound')
-    is_read = django_filters.BooleanFilter(label='Is Read')
-    
-    sent_after = django_filters.DateTimeFilter(
-        field_name='sent_at',
-        lookup_expr='gte',
-        label='Sent After'
-    )
-    sent_before = django_filters.DateTimeFilter(
-        field_name='sent_at',
-        lookup_expr='lte',
-        label='Sent Before'
-    )
-    
-    has_attachments = django_filters.BooleanFilter(
-        method='filter_has_attachments',
-        label='Has Attachments'
-    )
-    
-    from_email__icontains = django_filters.CharFilter(
-        field_name='from_email',
-        lookup_expr='icontains',
-        label='From Email Contains'
-    )
-    
-    class Meta:
-        model = CandidateEmail
-        fields = []
-    
-    def filter_search(self, queryset, name, value):
-        """Search across email fields"""
-        if not value:
-            return queryset
-        
-        return queryset.filter(
-            Q(subject__icontains=value) |
-            Q(body__icontains=value) |
-            Q(from_email__icontains=value) |
-            Q(to_email__icontains=value)
-        )
-    
-    def filter_has_attachments(self, queryset, name, value):
-        """Filter emails with or without attachments"""
+    def filter_has_work_experience(self, queryset, name, value):
+        """Filter candidates with or without work experience"""
         if value is True:
-            return queryset.filter(attachments__isnull=False).distinct()
+            return queryset.filter(work_experiences__isnull=False).distinct()
         elif value is False:
-            return queryset.filter(attachments__isnull=True)
+            return queryset.filter(work_experiences__isnull=True)
+        return queryset
+    
+    def filter_has_education(self, queryset, name, value):
+        """Filter candidates with or without education history"""
+        if value is True:
+            return queryset.filter(education_history__isnull=False).distinct()
+        elif value is False:
+            return queryset.filter(education_history__isnull=True)
+        return queryset
+    
+    def filter_has_projects(self, queryset, name, value):
+        """Filter candidates with or without projects"""
+        if value is True:
+            return queryset.filter(projects__isnull=False).distinct()
+        elif value is False:
+            return queryset.filter(projects__isnull=True)
         return queryset
 
 
-class EmailAttachmentFilter(django_filters.FilterSet):
-    """Filter set for EmailAttachment model"""
+class CandidateMPRFilter(django_filters.FilterSet):
+    """Filter set for CandidateMPR model"""
     
-    search = django_filters.CharFilter(method='filter_search', label='Search')
-    
-    file_type = django_filters.ChoiceFilter(
-        choices=EmailAttachment._meta.get_field('file_type').choices,
-        label='File Type'
+    # Application stage filters
+    application_stage = django_filters.ChoiceFilter(
+        choices=CandidateMPR._meta.get_field('application_stage').choices,
+        label='Application Stage'
+    )
+    application_stage__in = django_filters.MultipleChoiceFilter(
+        field_name='application_stage',
+        choices=CandidateMPR._meta.get_field('application_stage').choices,
+        label='Application Stage (Multiple)'
     )
     
-    is_visible_to_line_manager = django_filters.BooleanFilter(
-        label='Visible to Line Manager'
-    )
-    is_primary_cv = django_filters.BooleanFilter(label='Is Primary CV')
-    is_processed = django_filters.BooleanFilter(label='Is Processed')
-    
-    file_size__gte = django_filters.NumberFilter(
-        field_name='file_size',
+    # Date filters
+    applied_after = django_filters.DateFilter(
+        field_name='applied_at',
         lookup_expr='gte',
-        label='File Size (Min Bytes)'
+        label='Applied After'
     )
-    file_size__lte = django_filters.NumberFilter(
-        field_name='file_size',
+    applied_before = django_filters.DateFilter(
+        field_name='applied_at',
         lookup_expr='lte',
-        label='File Size (Max Bytes)'
+        label='Applied Before'
     )
     
-    uploaded_after = django_filters.DateTimeFilter(
-        field_name='uploaded_at',
-        lookup_expr='gte',
-        label='Uploaded After'
-    )
-    uploaded_before = django_filters.DateTimeFilter(
-        field_name='uploaded_at',
-        lookup_expr='lte',
-        label='Uploaded Before'
-    )
-    
-    mime_type__icontains = django_filters.CharFilter(
-        field_name='mime_type',
+    # MPR filters
+    mpr_number = django_filters.CharFilter(
+        field_name='mpr__mpr_number',
         lookup_expr='icontains',
-        label='MIME Type Contains'
+        label='MPR Number'
+    )
+    job_title = django_filters.CharFilter(
+        field_name='mpr__job_title__title',
+        lookup_expr='icontains',
+        label='Job Title'
+    )
+    department = django_filters.CharFilter(
+        field_name='mpr__department__name',
+        lookup_expr='icontains',
+        label='Department'
+    )
+    
+    # Primary CV filter
+    has_primary_cv = django_filters.BooleanFilter(
+        method='filter_has_primary_cv',
+        label='Has Primary CV'
+    )
+    
+    # Updated by filter
+    updated_by = django_filters.ModelChoiceFilter(
+        queryset=User.objects.none(),  # Will be set in __init__
+        label='Updated By'
     )
     
     class Meta:
-        model = EmailAttachment
+        model = CandidateMPR
         fields = []
     
-    def filter_search(self, queryset, name, value):
-        """Search across attachment fields"""
-        if not value:
-            return queryset
-        
-        return queryset.filter(
-            Q(original_file_name__icontains=value) |
-            Q(file_name__icontains=value) |
-            Q(extracted_text__icontains=value)
-        )
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set the queryset for updated_by filter
+        self.filters['updated_by'].queryset = User.objects.filter(
+            updated_candidate_mprs__isnull=False
+        ).distinct()
+    
+    def filter_has_primary_cv(self, queryset, name, value):
+        """Filter applications with or without primary CV"""
+        if value is True:
+            return queryset.filter(primary_cv__isnull=False)
+        elif value is False:
+            return queryset.filter(primary_cv__isnull=True)
+        return queryset

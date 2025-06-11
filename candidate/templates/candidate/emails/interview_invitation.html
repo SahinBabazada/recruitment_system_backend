@@ -1,0 +1,45 @@
+<!-- candidate/templates/candidate/emails/interview_invitation.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Interview Invitation</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #2c3e50;">Interview Invitation</h2>
+        
+        <p>Dear {{ candidate.name }},</p>
+        
+        <p>Congratulations! We are pleased to invite you for an interview for the position you applied for.</p>
+        
+        <div style="background-color: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0;">
+            <p><strong>Interview Details:</strong></p>
+            <p><strong>Position:</strong> {{ position|default:"Applied Position" }}</p>
+            <p><strong>Date:</strong> {{ interview_date|date:"F d, Y" }}</p>
+            <p><strong>Time:</strong> {{ interview_time|time:"g:i A" }}</p>
+            <p><strong>Duration:</strong> {{ duration|default:"60 minutes" }}</p>
+            <p><strong>Location:</strong> {{ location|default:"To be confirmed" }}</p>
+            {% if meeting_link %}
+            <p><strong>Meeting Link:</strong> <a href="{{ meeting_link }}">Join Interview</a></p>
+            {% endif %}
+        </div>
+        
+        <p>Please confirm your attendance by replying to this email.</p>
+        
+        <p>What to expect:</p>
+        <ul>
+            <li>Discussion about your background and experience</li>
+            <li>Questions about the role and company</li>
+            <li>Opportunity for you to ask questions</li>
+        </ul>
+        
+        <p>If you need to reschedule or have any questions, please contact us as soon as possible.</p>
+        
+        <p>We look forward to meeting you!</p>
+        
+        <p>Best regards,<br>
+        {{ sender.get_full_name|default:"Recruitment Team" }}</p>
+    </div>
+</body>
+</html>

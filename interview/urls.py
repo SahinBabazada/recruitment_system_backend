@@ -22,82 +22,82 @@ interviews_router.register(r'question-responses', InterviewQuestionResponseViewS
 
 urlpatterns = [
     # Main API endpoints
-    path('api/', include(router.urls)),
-    path('api/', include(interviews_router.urls)),
+    path('', include(router.urls)),
+    path('', include(interviews_router.urls)),
 ]
 
 # Custom URL patterns for specific actions
 urlpatterns += [
     # Interview Round specific endpoints
-    path('api/interview-rounds/<int:pk>/questions/', 
+    path('interview-rounds/<int:pk>/questions/', 
          InterviewRoundViewSet.as_view({'get': 'questions'}), 
          name='interview-round-questions'),
     
-    path('api/interview-rounds/<int:pk>/feedback-templates/', 
+    path('interview-rounds/<int:pk>/feedback-templates/', 
          InterviewRoundViewSet.as_view({'get': 'feedback_templates'}), 
          name='interview-round-feedback-templates'),
     
-    path('api/interview-rounds/<int:pk>/statistics/', 
+    path('interview-rounds/<int:pk>/statistics/', 
          InterviewRoundViewSet.as_view({'get': 'statistics'}), 
          name='interview-round-statistics'),
     
     # Interview specific endpoints
-    path('api/interviews/<int:pk>/update-status/', 
+    path('interviews/<int:pk>/update-status/', 
          InterviewViewSet.as_view({'post': 'update_status'}), 
          name='interview-update-status'),
     
-    path('api/interviews/<int:pk>/reschedule/', 
+    path('interviews/<int:pk>/reschedule/', 
          InterviewViewSet.as_view({'post': 'reschedule'}), 
          name='interview-reschedule'),
     
-    path('api/interviews/<int:pk>/cancel/', 
+    path('interviews/<int:pk>/cancel/', 
          InterviewViewSet.as_view({'post': 'cancel'}), 
          name='interview-cancel'),
     
-    path('api/interviews/<int:pk>/add-participant/', 
+    path('interviews/<int:pk>/add-participant/', 
          InterviewViewSet.as_view({'post': 'add_participant'}), 
          name='interview-add-participant'),
     
-    path('api/interviews/<int:pk>/submit-feedback/', 
+    path('interviews/<int:pk>/submit-feedback/', 
          InterviewViewSet.as_view({'post': 'submit_feedback'}), 
          name='interview-submit-feedback'),
     
-    path('api/interviews/<int:pk>/feedback-summary/', 
+    path('interviews/<int:pk>/feedback-summary/', 
          InterviewViewSet.as_view({'get': 'feedback_summary'}), 
          name='interview-feedback-summary'),
     
-    path('api/interviews/dashboard-stats/', 
+    path('interviews/dashboard-stats/', 
          InterviewViewSet.as_view({'get': 'dashboard_stats'}), 
          name='interview-dashboard-stats'),
     
-    path('api/interviews/upcoming/', 
+    path('interviews/upcoming/', 
          InterviewViewSet.as_view({'get': 'upcoming'}), 
          name='interview-upcoming'),
     
-    path('api/interviews/my-interviews/', 
+    path('interviews/my-interviews/', 
          InterviewViewSet.as_view({'get': 'my_interviews'}), 
          name='interview-my-interviews'),
     
     # Interview Participant specific endpoints
-    path('api/interviews/<int:interview_pk>/participants/<int:pk>/mark-attended/', 
+    path('interviews/<int:interview_pk>/participants/<int:pk>/mark-attended/', 
          InterviewParticipantViewSet.as_view({'post': 'mark_attended'}), 
          name='interview-participant-mark-attended'),
     
-    path('api/interviews/<int:interview_pk>/participants/<int:pk>/mark-left/', 
+    path('interviews/<int:interview_pk>/participants/<int:pk>/mark-left/', 
          InterviewParticipantViewSet.as_view({'post': 'mark_left'}), 
          name='interview-participant-mark-left'),
     
     # Interview Question specific endpoints
-    path('api/interview-questions/<int:pk>/increment-usage/', 
+    path('interview-questions/<int:pk>/increment-usage/', 
          InterviewQuestionViewSet.as_view({'post': 'increment_usage'}), 
          name='interview-question-increment-usage'),
     
-    path('api/interview-questions/by-round/', 
+    path('interview-questions/by-round/', 
          InterviewQuestionViewSet.as_view({'get': 'by_round'}), 
          name='interview-questions-by-round'),
     
     # Feedback Template specific endpoints
-    path('api/feedback-templates/<int:pk>/set-default/', 
+    path('feedback-templates/<int:pk>/set-default/', 
          InterviewFeedbackTemplateViewSet.as_view({'post': 'set_default'}), 
          name='feedback-template-set-default'),
 ]
@@ -107,47 +107,47 @@ urlpatterns += [
 Interview API Endpoints:
 
 Main Resources:
-- GET/POST /api/interview-rounds/ - List/Create interview rounds
-- GET/PUT/PATCH/DELETE /api/interview-rounds/{id}/ - Manage interview round
-- GET/POST /api/interviews/ - List/Create interviews
-- GET/PUT/PATCH/DELETE /api/interviews/{id}/ - Manage interview
-- GET/POST /api/interview-questions/ - List/Create questions
-- GET/PUT/PATCH/DELETE /api/interview-questions/{id}/ - Manage question
-- GET/POST /api/feedback-templates/ - List/Create feedback templates
-- GET/PUT/PATCH/DELETE /api/feedback-templates/{id}/ - Manage template
+- GET/POST /interview-rounds/ - List/Create interview rounds
+- GET/PUT/PATCH/DELETE /interview-rounds/{id}/ - Manage interview round
+- GET/POST /interviews/ - List/Create interviews
+- GET/PUT/PATCH/DELETE /interviews/{id}/ - Manage interview
+- GET/POST /interview-questions/ - List/Create questions
+- GET/PUT/PATCH/DELETE /interview-questions/{id}/ - Manage question
+- GET/POST /feedback-templates/ - List/Create feedback templates
+- GET/PUT/PATCH/DELETE /feedback-templates/{id}/ - Manage template
 
 Interview Round Actions:
-- GET /api/interview-rounds/{id}/questions/ - Get questions for round
-- GET /api/interview-rounds/{id}/feedback-templates/ - Get templates for round
-- GET /api/interview-rounds/{id}/statistics/ - Get round statistics
+- GET /interview-rounds/{id}/questions/ - Get questions for round
+- GET /interview-rounds/{id}/feedback-templates/ - Get templates for round
+- GET /interview-rounds/{id}/statistics/ - Get round statistics
 
 Interview Actions:
-- POST /api/interviews/{id}/update-status/ - Update interview status
-- POST /api/interviews/{id}/reschedule/ - Reschedule interview
-- POST /api/interviews/{id}/cancel/ - Cancel interview
-- POST /api/interviews/{id}/add-participant/ - Add participant
-- POST /api/interviews/{id}/submit-feedback/ - Submit participant feedback
-- GET /api/interviews/{id}/feedback-summary/ - Get feedback summary
-- GET /api/interviews/dashboard-stats/ - Dashboard statistics
-- GET /api/interviews/upcoming/ - Upcoming interviews
-- GET /api/interviews/my-interviews/ - Current user's interviews
+- POST /interviews/{id}/update-status/ - Update interview status
+- POST /interviews/{id}/reschedule/ - Reschedule interview
+- POST /interviews/{id}/cancel/ - Cancel interview
+- POST /interviews/{id}/add-participant/ - Add participant
+- POST /interviews/{id}/submit-feedback/ - Submit participant feedback
+- GET /interviews/{id}/feedback-summary/ - Get feedback summary
+- GET /interviews/dashboard-stats/ - Dashboard statistics
+- GET /interviews/upcoming/ - Upcoming interviews
+- GET /interviews/my-interviews/ - Current user's interviews
 
 Interview Participants:
-- GET/POST /api/interviews/{interview_id}/participants/ - List/Add participants
-- GET/PUT/PATCH/DELETE /api/interviews/{interview_id}/participants/{id}/ - Manage participant
-- POST /api/interviews/{interview_id}/participants/{id}/mark-attended/ - Mark attended
-- POST /api/interviews/{interview_id}/participants/{id}/mark-left/ - Mark left
+- GET/POST /interviews/{interview_id}/participants/ - List/Add participants
+- GET/PUT/PATCH/DELETE /interviews/{interview_id}/participants/{id}/ - Manage participant
+- POST /interviews/{interview_id}/participants/{id}/mark-attended/ - Mark attended
+- POST /interviews/{interview_id}/participants/{id}/mark-left/ - Mark left
 
 Question Responses:
-- GET/POST /api/interviews/{interview_id}/question-responses/ - List/Create responses
-- GET/PUT/PATCH/DELETE /api/interviews/{interview_id}/question-responses/{id}/ - Manage response
+- GET/POST /interviews/{interview_id}/question-responses/ - List/Create responses
+- GET/PUT/PATCH/DELETE /interviews/{interview_id}/question-responses/{id}/ - Manage response
 
 Question Management:
-- POST /api/interview-questions/{id}/increment-usage/ - Increment usage count
-- GET /api/interview-questions/by-round/ - Group questions by round
+- POST /interview-questions/{id}/increment-usage/ - Increment usage count
+- GET /interview-questions/by-round/ - Group questions by round
 
 Template Management:
-- POST /api/feedback-templates/{id}/set-default/ - Set as default template
+- POST /feedback-templates/{id}/set-default/ - Set as default template
 
 Filter Parameters:
 
@@ -183,16 +183,16 @@ Question Filters:
 - has_follow_up_questions, has_ideal_answer_points: Filter by content
 
 Example Usage:
-GET /api/interviews/?status=scheduled&is_upcoming=true
-GET /api/interviews/?candidate_name__icontains=john&overall_score__gte=4.0
-GET /api/interviews/123/participants/?role=primary_interviewer
-GET /api/interview-questions/?interview_round=1&question_type=technical
-GET /api/interviews/?search=python&scheduled_date_range_after=2025-06-01
+GET /interviews/?status=scheduled&is_upcoming=true
+GET /interviews/?candidate_name__icontains=john&overall_score__gte=4.0
+GET /interviews/123/participants/?role=primary_interviewer
+GET /interview-questions/?interview_round=1&question_type=technical
+GET /interviews/?search=python&scheduled_date_range_after=2025-06-01
 
 Request/Response Examples:
 
 Create Interview:
-POST /api/interviews/
+POST /interviews/
 {
     "candidate": 123,
     "mpr": 456,
@@ -208,7 +208,7 @@ POST /api/interviews/
 }
 
 Update Interview Status:
-POST /api/interviews/123/update-status/
+POST /interviews/123/update-status/
 {
     "status": "completed",
     "actual_start_time": "2025-06-15T10:05:00Z",
@@ -216,7 +216,7 @@ POST /api/interviews/123/update-status/
 }
 
 Submit Feedback:
-POST /api/interviews/123/submit-feedback/
+POST /interviews/123/submit-feedback/
 {
     "individual_score": 4.5,
     "individual_feedback": "Strong technical skills, good communication",
@@ -238,7 +238,7 @@ POST /api/interviews/123/submit-feedback/
 }
 
 Reschedule Interview:
-POST /api/interviews/123/reschedule/
+POST /interviews/123/reschedule/
 {
     "new_date": "2025-06-16T14:00:00Z",
     "new_location": "Conference Room A",

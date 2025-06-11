@@ -1,0 +1,18 @@
+<!-- candidate/templates/candidate/emails/status_update.txt -->
+Candidate Status Update
+
+Hello,
+
+The status of candidate {{ candidate.name }} has been updated.
+
+Candidate: {{ candidate.name }} ({{ candidate.email }})
+Previous Status: {{ status_update.get_previous_status_display }}
+New Status: {{ status_update.get_new_status_display }}
+Updated By: {{ updated_by }}
+Date: {{ status_update.updated_at|date:"F d, Y g:i A" }}
+{% if status_update.reason %}Reason: {{ status_update.reason }}{% endif %}
+
+Please review the candidate's profile for more details.
+
+Best regards,
+HR System

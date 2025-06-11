@@ -1,5 +1,5 @@
 import django_filters
-from django.db.models import Q
+from django.db.models import Q, Count, F
 from django.utils import timezone
 from datetime import timedelta
 from .models import Interview, InterviewParticipant, InterviewQuestion, InterviewRound
@@ -207,156 +207,7 @@ class InterviewFilter(django_filters.FilterSet):
     )
     
     class Meta:
-        model = InterviewParticipant
-        fields = []
-    
-    def filter_has_individual_score(self, queryset, name, value):
-        """Filter participants with or without individual score"""
-        if value is True:
-            return queryset.filter(individual_score__isnull=False)
-        elif value is False:
-            return queryset.filter(individual_score__isnull=True)
-        return queryset
-    
-    def filter_user_name(self, queryset, name, value):
-        """Filter by user name"""
-        if not value:
-            return queryset
-        
-        return queryset.filter(
-            Q(user__first_name__icontains=value) |
-            Q(user__last_name__icontains=value) |
-            Q(user__username__icontains=value)
-        )
-
-
-class InterviewQuestionFilter(django_filters.FilterSet):
-    """Filter set for InterviewQuestion model"""
-    
-    search = django_filters.CharFilter(method='filter_search', label='Search')
-    
-    interview_round = django_filters.ModelChoiceFilter(
-        queryset=InterviewRound.objects.filter(is_active=True),
-        label='Interview Round'
-    )
-    
-    question_type = django_filters.ChoiceFilter(
-        choices=InterviewQuestion._meta.get_field('question_type').choices,
-        label='Question Type'
-    )
-    question_type__in = django_filters.MultipleChoiceFilter(
-        field_name='question_type',
-        choices=InterviewQuestion._meta.get_field('question_type').choices,
-        label='Question Type (Multiple)'
-    )
-    
-    difficulty_level = django_filters.ChoiceFilter(
-        choices=InterviewQuestion._meta.get_field('difficulty_level').choices,
-        label='Difficulty Level'
-    )
-    difficulty_level__in = django_filters.MultipleChoiceFilter(
-        field_name='difficulty_level',
-        choices=InterviewQuestion._meta.get_field('difficulty_level').choices,
-        label='Difficulty Level (Multiple)'
-    )
-    
-    is_active = django_filters.BooleanFilter(label='Is Active')
-    
-    estimated_time_minutes__gte = django_filters.NumberFilter(
-        field_name='estimated_time_minutes',
-        lookup_expr='gte',
-        label='Estimated Time (Min Minutes)'
-    )
-    estimated_time_minutes__lte = django_filters.NumberFilter(
-        field_name='estimated_time_minutes',
-        lookup_expr='lte',
-        label='Estimated Time (Max Minutes)'
-    )
-    
-    usage_count__gte = django_filters.NumberFilter(
-        field_name='usage_count',
-        lookup_expr='gte',
-        label='Usage Count (Min)'
-    )
-    usage_count__lte = django_filters.NumberFilter(
-        field_name='usage_count',
-        lookup_expr='lte',
-        label='Usage Count (Max)'
-    )
-    
-    has_follow_up_questions = django_filters.BooleanFilter(
-        method='filter_has_follow_up_questions',
-        label='Has Follow-up Questions'
-    )
-    
-    has_ideal_answer_points = django_filters.BooleanFilter(
-        method='filter_has_ideal_answer_points',
-        label='Has Ideal Answer Points'
-    )
-    
-    created_by = django_filters.NumberFilter(
-        field_name='created_by',
-        label='Created By User ID'
-    )
-    
-    created_after = django_filters.DateTimeFilter(
-        field_name='created_at',
-        lookup_expr='gte',
-        label='Created After'
-    )
-    created_before = django_filters.DateTimeFilter(
-        field_name='created_at',
-        lookup_expr='lte',
-        label='Created Before'
-    )
-    
-    evaluation_criteria__contains = django_filters.CharFilter(
-        method='filter_evaluation_criteria',
-        label='Has Evaluation Criteria'
-    )
-    
-    class Meta:
-        model = InterviewQuestion
-        fields = []
-    
-    def filter_search(self, queryset, name, value):
-        """Search across question fields"""
-        if not value:
-            return queryset
-        
-        return queryset.filter(
-            Q(question_text__icontains=value) |
-            Q(follow_up_questions__icontains=value) |
-            Q(ideal_answer_points__icontains=value)
-        )
-    
-    def filter_has_follow_up_questions(self, queryset, name, value):
-        """Filter questions with or without follow-up questions"""
-        if value is True:
-            return queryset.filter(follow_up_questions__isnull=False).exclude(follow_up_questions='')
-        elif value is False:
-            return queryset.filter(Q(follow_up_questions__isnull=True) | Q(follow_up_questions=''))
-        return queryset
-    
-    def filter_has_ideal_answer_points(self, queryset, name, value):
-        """Filter questions with or without ideal answer points"""
-        if value is True:
-            return queryset.filter(ideal_answer_points__isnull=False).exclude(ideal_answer_points='')
-        elif value is False:
-            return queryset.filter(Q(ideal_answer_points__isnull=True) | Q(ideal_answer_points=''))
-        return queryset
-    
-    def filter_evaluation_criteria(self, queryset, name, value):
-        """Filter by evaluation criteria (JSON field)"""
-        if not value:
-            return queryset
-        
-        return queryset.filter(evaluation_criteria__contains=[value])
-
-
-# Additional imports needed at the top
-from django.db.models import Count, F:
-        model = Interview
+        model = Interview  # FIXED: Changed from InterviewParticipant to Interview
         fields = []
     
     def filter_search(self, queryset, name, value):
@@ -538,4 +389,149 @@ class InterviewParticipantFilter(django_filters.FilterSet):
     send_calendar_invite = django_filters.BooleanFilter(label='Send Calendar Invite')
     send_reminders = django_filters.BooleanFilter(label='Send Reminders')
     
-    class Meta
+    class Meta:
+        model = InterviewParticipant
+        fields = []
+    
+    def filter_has_individual_score(self, queryset, name, value):
+        """Filter participants with or without individual score"""
+        if value is True:
+            return queryset.filter(individual_score__isnull=False)
+        elif value is False:
+            return queryset.filter(individual_score__isnull=True)
+        return queryset
+    
+    def filter_user_name(self, queryset, name, value):
+        """Filter by user name"""
+        if not value:
+            return queryset
+        
+        return queryset.filter(
+            Q(user__first_name__icontains=value) |
+            Q(user__last_name__icontains=value) |
+            Q(user__username__icontains=value)
+        )
+
+
+class InterviewQuestionFilter(django_filters.FilterSet):
+    """Filter set for InterviewQuestion model"""
+    
+    search = django_filters.CharFilter(method='filter_search', label='Search')
+    
+    interview_round = django_filters.ModelChoiceFilter(
+        queryset=InterviewRound.objects.filter(is_active=True),
+        label='Interview Round'
+    )
+    
+    question_type = django_filters.ChoiceFilter(
+        choices=InterviewQuestion._meta.get_field('question_type').choices,
+        label='Question Type'
+    )
+    question_type__in = django_filters.MultipleChoiceFilter(
+        field_name='question_type',
+        choices=InterviewQuestion._meta.get_field('question_type').choices,
+        label='Question Type (Multiple)'
+    )
+    
+    difficulty_level = django_filters.ChoiceFilter(
+        choices=InterviewQuestion._meta.get_field('difficulty_level').choices,
+        label='Difficulty Level'
+    )
+    difficulty_level__in = django_filters.MultipleChoiceFilter(
+        field_name='difficulty_level',
+        choices=InterviewQuestion._meta.get_field('difficulty_level').choices,
+        label='Difficulty Level (Multiple)'
+    )
+    
+    is_active = django_filters.BooleanFilter(label='Is Active')
+    
+    estimated_time_minutes__gte = django_filters.NumberFilter(
+        field_name='estimated_time_minutes',
+        lookup_expr='gte',
+        label='Estimated Time (Min Minutes)'
+    )
+    estimated_time_minutes__lte = django_filters.NumberFilter(
+        field_name='estimated_time_minutes',
+        lookup_expr='lte',
+        label='Estimated Time (Max Minutes)'
+    )
+    
+    usage_count__gte = django_filters.NumberFilter(
+        field_name='usage_count',
+        lookup_expr='gte',
+        label='Usage Count (Min)'
+    )
+    usage_count__lte = django_filters.NumberFilter(
+        field_name='usage_count',
+        lookup_expr='lte',
+        label='Usage Count (Max)'
+    )
+    
+    has_follow_up_questions = django_filters.BooleanFilter(
+        method='filter_has_follow_up_questions',
+        label='Has Follow-up Questions'
+    )
+    
+    has_ideal_answer_points = django_filters.BooleanFilter(
+        method='filter_has_ideal_answer_points',
+        label='Has Ideal Answer Points'
+    )
+    
+    created_by = django_filters.NumberFilter(
+        field_name='created_by',
+        label='Created By User ID'
+    )
+    
+    created_after = django_filters.DateTimeFilter(
+        field_name='created_at',
+        lookup_expr='gte',
+        label='Created After'
+    )
+    created_before = django_filters.DateTimeFilter(
+        field_name='created_at',
+        lookup_expr='lte',
+        label='Created Before'
+    )
+    
+    evaluation_criteria__contains = django_filters.CharFilter(
+        method='filter_evaluation_criteria',
+        label='Has Evaluation Criteria'
+    )
+    
+    class Meta:
+        model = InterviewQuestion
+        fields = []
+    
+    def filter_search(self, queryset, name, value):
+        """Search across question fields"""
+        if not value:
+            return queryset
+        
+        return queryset.filter(
+            Q(question_text__icontains=value) |
+            Q(follow_up_questions__icontains=value) |
+            Q(ideal_answer_points__icontains=value)
+        )
+    
+    def filter_has_follow_up_questions(self, queryset, name, value):
+        """Filter questions with or without follow-up questions"""
+        if value is True:
+            return queryset.filter(follow_up_questions__isnull=False).exclude(follow_up_questions='')
+        elif value is False:
+            return queryset.filter(Q(follow_up_questions__isnull=True) | Q(follow_up_questions=''))
+        return queryset
+    
+    def filter_has_ideal_answer_points(self, queryset, name, value):
+        """Filter questions with or without ideal answer points"""
+        if value is True:
+            return queryset.filter(ideal_answer_points__isnull=False).exclude(ideal_answer_points='')
+        elif value is False:
+            return queryset.filter(Q(ideal_answer_points__isnull=True) | Q(ideal_answer_points=''))
+        return queryset
+    
+    def filter_evaluation_criteria(self, queryset, name, value):
+        """Filter by evaluation criteria (JSON field)"""
+        if not value:
+            return queryset
+        
+        return queryset.filter(evaluation_criteria__contains=[value])

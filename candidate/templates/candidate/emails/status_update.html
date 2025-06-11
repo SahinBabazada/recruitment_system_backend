@@ -1,0 +1,33 @@
+<!-- candidate/templates/candidate/emails/status_update.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Candidate Status Update</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #2c3e50;">Candidate Status Update</h2>
+        
+        <p>Hello,</p>
+        
+        <p>The status of candidate <strong>{{ candidate.name }}</strong> has been updated.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin: 20px 0;">
+            <p><strong>Candidate:</strong> {{ candidate.name }} ({{ candidate.email }})</p>
+            <p><strong>Previous Status:</strong> {{ status_update.get_previous_status_display }}</p>
+            <p><strong>New Status:</strong> {{ status_update.get_new_status_display }}</p>
+            <p><strong>Updated By:</strong> {{ updated_by }}</p>
+            <p><strong>Date:</strong> {{ status_update.updated_at|date:"F d, Y g:i A" }}</p>
+            {% if status_update.reason %}
+            <p><strong>Reason:</strong> {{ status_update.reason }}</p>
+            {% endif %}
+        </div>
+        
+        <p>Please review the candidate's profile for more details.</p>
+        
+        <p>Best regards,<br>
+        HR System</p>
+    </div>
+</body>
+</html>

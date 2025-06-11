@@ -1,0 +1,1 @@
+ERROR 2025-06-11 17:12:49,343 email_integration 11684 8536 Email sync failed: contains lookup is not supported on this database backend.

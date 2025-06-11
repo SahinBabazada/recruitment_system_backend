@@ -1,0 +1,28 @@
+<!-- candidate/templates/candidate/emails/interview_invitation.txt -->
+Interview Invitation
+
+Dear {{ candidate.name }},
+
+Congratulations! We are pleased to invite you for an interview for the position you applied for.
+
+Interview Details:
+Position: {{ position|default:"Applied Position" }}
+Date: {{ interview_date|date:"F d, Y" }}
+Time: {{ interview_time|time:"g:i A" }}
+Duration: {{ duration|default:"60 minutes" }}
+Location: {{ location|default:"To be confirmed" }}
+{% if meeting_link %}Meeting Link: {{ meeting_link }}{% endif %}
+
+Please confirm your attendance by replying to this email.
+
+What to expect:
+- Discussion about your background and experience
+- Questions about the role and company
+- Opportunity for you to ask questions
+
+If you need to reschedule or have any questions, please contact us as soon as possible.
+
+We look forward to meeting you!
+
+Best regards,
+{{ sender.get_full_name|default:"Recruitment Team" }}

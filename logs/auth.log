@@ -348,3 +348,15 @@ INFO 2025-06-08 20:03:20,843 views 48410 6168162304 Updated existing user: shbab
 ERROR 2025-06-08 22:10:35,265 authentication 48410 6168162304 Authentication failed: Token validation failed - invalid or expired token
 INFO 2025-06-08 22:10:39,851 views 48410 6168162304 Creating/updating user - Azure ID: e839e4be-c776-44ab-9e69-213d44a243cf, Email: shbabazade@azerbaijansupermarket.com
 INFO 2025-06-08 22:10:39,869 views 48410 6168162304 Updated existing user: shbabazade
+ERROR 2025-06-11 15:43:35,913 authentication 11800 21184 Authentication failed: Token validation failed - invalid or expired token
+INFO 2025-06-11 15:43:59,548 views 11800 22176 Creating/updating user - Azure ID: e839e4be-c776-44ab-9e69-213d44a243cf, Email: shbabazade@azerbaijansupermarket.com
+INFO 2025-06-11 15:44:00,225 views 11800 22176 Created new Azure user: shbabazade
+WARNING 2025-06-11 15:44:00,284 views 11800 22176 Failed to assign default role to user shbabazade: Role 'Employee' does not exist
+INFO 2025-06-11 16:35:15,278 views 10392 6560 Creating/updating user - Azure ID: e839e4be-c776-44ab-9e69-213d44a243cf, Email: shbabazade@azerbaijansupermarket.com
+INFO 2025-06-11 16:35:15,935 views 10392 6560 Updated existing user: shbabazade
+INFO 2025-06-11 16:56:43,584 views 17708 25092 Creating/updating user - Azure ID: e839e4be-c776-44ab-9e69-213d44a243cf, Email: shbabazade@azerbaijansupermarket.com
+INFO 2025-06-11 16:56:44,056 views 17708 25092 Updated existing user: shbabazade
+INFO 2025-06-11 17:06:33,689 views 16920 19548 Creating/updating user - Azure ID: e839e4be-c776-44ab-9e69-213d44a243cf, Email: shbabazade@azerbaijansupermarket.com
+INFO 2025-06-11 17:06:34,090 views 16920 19548 Updated existing user: shbabazade
+INFO 2025-06-11 17:26:48,585 views 28572 7828 Creating/updating user - Azure ID: e839e4be-c776-44ab-9e69-213d44a243cf, Email: shbabazade@azerbaijansupermarket.com
+INFO 2025-06-11 17:26:49,014 views 28572 7828 Updated existing user: shbabazade

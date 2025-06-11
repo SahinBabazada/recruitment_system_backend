@@ -1,0 +1,22 @@
+<!-- candidate/templates/candidate/emails/welcome.txt -->
+Welcome to Our Recruitment Process
+
+Dear {{ candidate.name }},
+
+Thank you for your interest in joining our team. We have received your application and wanted to confirm that it's being reviewed by our recruitment team.
+
+Application Details:
+Position: {{ position|default:"Various Positions" }}
+Application Date: {{ candidate.applied_at|date:"F d, Y" }}
+Status: {{ candidate.get_hiring_status_display }}
+
+What happens next:
+- Our team will review your application within 5-7 business days
+- If your profile matches our requirements, we'll contact you for the next steps
+- You'll receive updates via email throughout the process
+
+If you have any questions, please don't hesitate to contact us.
+
+Best regards,
+{{ sender.get_full_name|default:"Recruitment Team" }}
+{{ company_name|default:"Our Company" }}
