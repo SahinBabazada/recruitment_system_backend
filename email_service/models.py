@@ -160,6 +160,22 @@ class EmailMessage(models.Model):
         """Convert importance to priority for frontend compatibility"""
         mapping = {'low': 'low', 'normal': 'medium', 'high': 'high'}
         return mapping.get(self.importance, 'medium')
+    
+    def get_linked_candidate(self):
+        """Get candidate linked to this email if any"""
+        from candidate.models import Candidate
+        try:
+            return Candidate.objects.get(email__iexact=self.from_email)
+        except Candidate.DoesNotExist:
+            return None
+
+    def has_candidate_connection(self):
+        """Check if this email has a candidate connection"""
+        return hasattr(self, 'candidate_connections') and self.candidate_connections.exists()
+
+    def get_candidate_connection(self):
+        """Get the candidate connection for this email"""
+        return self.candidate_connections.first() if self.has_candidate_connection() else None
 
     def to_dict(self):
         """Convert to dictionary for frontend consumption"""
@@ -168,6 +184,7 @@ class EmailMessage(models.Model):
             'subject': self.subject,
             'from': self.from_email,
             'fromName': self.from_name,
+            'body_preview': self.body_preview,
             'to': ', '.join([r.get('emailAddress', {}).get('address', '') for r in self.to_recipients]),
             'content': self.body_preview,
             'timestamp': self.received_datetime.isoformat(),
@@ -177,6 +194,7 @@ class EmailMessage(models.Model):
             'avatar': self.from_name[:2].upper() if self.from_name else 'UN',
             'hasAttachment': self.has_attachments,
             'labels': self.categories,
+            'has_attachments': self.has_attachments,
             'attachments': []  # Will be populated by attachments if needed
         }
 

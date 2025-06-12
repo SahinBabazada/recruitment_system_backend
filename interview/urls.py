@@ -66,7 +66,7 @@ urlpatterns += [
          InterviewViewSet.as_view({'get': 'feedback_summary'}), 
          name='interview-feedback-summary'),
     
-    path('interviews/dashboard-stats/', 
+    path('dashboard-stats/', 
          InterviewViewSet.as_view({'get': 'dashboard_stats'}), 
          name='interview-dashboard-stats'),
     

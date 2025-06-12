@@ -23,4 +23,9 @@ urlpatterns = [
     
     # Folder/category endpoints
     path('api/folders/counts/', views.get_folder_counts, name='folder-counts'),
+
+    # Candidate integration endpoints
+    path('api/emails/<int:email_id>/create-candidate/', views.create_candidate_from_email, name='create-candidate-from-email'),
+    path('api/emails/with-candidate-status/', views.get_emails_with_candidate_status, name='get-emails-with-candidate-status'),
+    path('api/emails/by-candidate/', views.get_candidate_emails, name='get-candidate-emails'),
 ]

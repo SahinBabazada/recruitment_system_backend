@@ -221,18 +221,116 @@ class CandidateViewSet(viewsets.ModelViewSet):
         }
         
         return Response(summary)
-    
-    @action(detail=True, methods=['post'])
-    def sync_emails(self, request, pk=None):
-        """Sync emails for specific candidate"""
+
+    @action(detail=True, methods=['get'])
+    def emails(self, request, pk=None):
+        """Get all emails for this candidate"""
         candidate = self.get_object()
         
-        result = EmailSyncService.sync_new_candidate_emails(candidate)
+        # Get email connections
+        connections = candidate.email_connections.select_related('email_message').order_by(
+            '-email_message__received_datetime'
+        )
+        
+        emails_data = []
+        for connection in connections:
+            email = connection.email_message
+            email_dict = {
+                'id': email.id,
+                'subject': email.subject,
+                'from_email': email.from_email,
+                'from_name': email.from_name,
+                'body_preview': email.body_preview,
+                'received_datetime': email.received_datetime.isoformat(),
+                'is_read': email.is_read,
+                'has_attachments': email.has_attachments,
+                'email_type': connection.email_type,
+                'requires_response': connection.requires_response,
+                'is_responded': connection.is_responded,
+                'internal_notes': connection.internal_notes
+            }
+            emails_data.append(email_dict)
         
         return Response({
-            'message': 'Email sync completed',
-            'result': result
+            'candidate': CandidateDetailSerializer(candidate).data,
+            'emails': emails_data,
+            'total_emails': len(emails_data)
         })
+
+    @action(detail=False, methods=['post'])
+    def sync_emails(self, request):
+        """Sync emails for all candidates or specific candidate"""
+        candidate_email = request.data.get('candidate_email')
+        
+        if candidate_email:
+            # Sync for specific candidate
+            try:
+                candidate = Candidate.objects.get(email__iexact=candidate_email)
+                result = self._sync_candidate_emails(candidate)
+                return Response({
+                    'success': True,
+                    'message': f'Synced emails for {candidate.name}',
+                    'result': result
+                })
+            except Candidate.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'error': 'Candidate not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Sync for all candidates
+            candidates = Candidate.objects.all()
+            total_synced = 0
+            
+            for candidate in candidates:
+                result = self._sync_candidate_emails(candidate)
+                total_synced += result.get('linked_emails', 0)
+            
+            return Response({
+                'success': True,
+                'message': f'Synced emails for {candidates.count()} candidates',
+                'total_linked_emails': total_synced
+            })
+
+    def _sync_candidate_emails(self, candidate):
+        """Sync emails for a specific candidate"""
+        from email_service.models import EmailMessage
+        
+        # Find emails from this candidate that aren't linked yet
+        unlinked_emails = EmailMessage.objects.filter(
+            from_email__iexact=candidate.email
+        ).exclude(
+            candidate_connections__candidate=candidate
+        )
+        
+        linked_count = 0
+        for email in unlinked_emails:
+            # Create email connection
+            CandidateEmailConnection.objects.create(
+                candidate=candidate,
+                email_message=email,
+                email_type='general',
+                is_inbound=True,
+                internal_notes='Auto-linked during sync'
+            )
+            linked_count += 1
+        
+        return {
+            'linked_emails': linked_count,
+            'candidate': candidate.name
+        }
+
+    # @action(detail=True, methods=['post'])
+    # def sync_emails(self, request, pk=None):
+    #     """Sync emails for specific candidate"""
+    #     candidate = self.get_object()
+        
+    #     result = EmailSyncService.sync_new_candidate_emails(candidate)
+        
+    #     return Response({
+    #         'message': 'Email sync completed',
+    #         'result': result
+    #     })
 
 
 class CandidateWorkExperienceViewSet(viewsets.ModelViewSet):
@@ -323,7 +421,6 @@ class CandidateEmailConnectionViewSet(viewsets.ModelViewSet):
         candidate_pk = self.kwargs.get('candidate_pk')
         candidate = get_object_or_404(Candidate, pk=candidate_pk)
         serializer.save(candidate=candidate)
-
 
 class CandidateAttachmentViewSet(viewsets.ModelViewSet):
     """ViewSet for candidate attachments"""

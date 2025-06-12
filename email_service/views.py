@@ -1,4 +1,7 @@
 # email_service/views.py
+from candidate.models import Candidate, CandidateEmailConnection
+from candidate.serializers import CandidateListSerializer
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -9,6 +12,8 @@ from .models import EmailServiceSetting, EmailMessage
 from .services import EmailSyncService, EmailAPIService
 from .serializers import EmailServiceSettingSerializer, EmailMessageSerializer
 import logging
+
+from email_service import models
 
 logger = logging.getLogger(__name__)
 
@@ -387,6 +392,245 @@ def search_emails(request):
         
     except Exception as e:
         logger.error(f"Failed to search emails: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_candidate_from_email(request, email_id):
+    """
+    Create a candidate from an email
+    """
+    try:
+        email = get_object_or_404(EmailMessage, id=email_id)
+        
+        # Check if candidate already exists
+        existing_candidate = Candidate.objects.filter(email__iexact=email.from_email).first()
+        if existing_candidate:
+            # Create connection if it doesn't exist
+            connection, created = CandidateEmailConnection.objects.get_or_create(
+                candidate=existing_candidate,
+                email_message=email,
+                defaults={
+                    'email_type': 'general',
+                    'is_inbound': True
+                }
+            )
+            return JsonResponse({
+                'success': True,
+                'message': 'Email linked to existing candidate',
+                'candidate': CandidateListSerializer(existing_candidate).data,
+                'connection_created': created
+            })
+        
+        # Extract name from email
+        if email.from_name:
+            name_parts = email.from_name.split()
+            first_name = name_parts[0] if name_parts else ''
+            last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+        else:
+            # Extract from email address
+            local_part = email.from_email.split('@')[0]
+            name_parts = local_part.replace('.', ' ').replace('_', ' ').split()
+            first_name = name_parts[0] if name_parts else ''
+            last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+        
+        # Get data from request or use extracted data
+        candidate_data = {
+            'name': request.data.get('name', f"{first_name} {last_name}".strip()),
+            'email': email.from_email,
+            'hiring_status': 'applied',
+            'professional_summary': f'Candidate created from email: {email.subject}',
+        }
+        
+        # Create candidate
+        candidate = Candidate.objects.create(**candidate_data)
+        
+        # Create email connection
+        CandidateEmailConnection.objects.create(
+            candidate=candidate,
+            email_message=email,
+            email_type='application',
+            is_inbound=True,
+            internal_notes=f'Created candidate from email: {email.subject}'
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Candidate created successfully',
+            'candidate': CandidateListSerializer(candidate).data
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to create candidate from email: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_emails_with_candidate_status(request):
+    """
+    Get emails with candidate status information
+    """
+    try:
+        # Get emails using existing logic
+        category = request.GET.get('category', 'inbox')
+        service_id = request.GET.get('service_id')
+        search_query = request.GET.get('search', '')
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 50))
+        filter_type = request.GET.get('filter')  # 'candidates', 'non-candidates', 'all'
+        
+        # Get base queryset
+        queryset = EmailMessage.objects.select_related('service')
+        
+        # Filter by service
+        if service_id:
+            queryset = queryset.filter(service_id=service_id)
+        else:
+            default_service = EmailServiceSetting.get_default_service()
+            if default_service:
+                queryset = queryset.filter(service=default_service)
+        
+        # Filter by category/folder
+        if category and category != 'all':
+            if category == 'inbox':
+                queryset = queryset.filter(folder_name__icontains='inbox')
+            elif category == 'sent':
+                queryset = queryset.filter(folder_name__icontains='sent')
+            elif category == 'draft':
+                queryset = queryset.filter(is_draft=True)
+            else:
+                queryset = queryset.filter(folder_name__icontains=category)
+        
+        # Get candidate emails for filtering
+        candidate_emails = set(Candidate.objects.values_list('email', flat=True))
+        
+        # Apply candidate filter
+        if filter_type == 'candidates':
+            queryset = queryset.filter(from_email__in=candidate_emails)
+        elif filter_type == 'non-candidates':
+            queryset = queryset.exclude(from_email__in=candidate_emails)
+        
+        # Apply search filter
+        if search_query:
+            queryset = queryset.filter(
+                models.Q(subject__icontains=search_query) |
+                models.Q(from_name__icontains=search_query) |
+                models.Q(from_email__icontains=search_query) |
+                models.Q(body_preview__icontains=search_query)
+            )
+        
+        # Pagination
+        start = (page - 1) * page_size
+        end = start + page_size
+        emails = queryset.order_by('-received_datetime')[start:end]
+        
+        # Enhance emails with candidate information
+        enhanced_emails = []
+        for email in emails:
+            email_dict = email.to_dict()
+            
+            # Check if sender is a candidate
+            candidate = Candidate.objects.filter(email__iexact=email.from_email).first()
+            if candidate:
+                email_dict['candidate'] = {
+                    'id': candidate.id,
+                    'name': candidate.name,
+                    'hiring_status': candidate.hiring_status,
+                    'overall_score': float(candidate.overall_score) if candidate.overall_score else None
+                }
+            else:
+                email_dict['candidate'] = None
+            
+            # Check if there's an email connection
+            connection = email.candidate_connections.first()
+            if connection:
+                email_dict['email_connection'] = {
+                    'id': connection.id,
+                    'email_type': connection.email_type,
+                    'requires_response': connection.requires_response,
+                    'is_responded': connection.is_responded
+                }
+            else:
+                email_dict['email_connection'] = None
+                
+            enhanced_emails.append(email_dict)
+        
+        # Get counts for filters
+        total_emails = queryset.count()
+        candidate_emails_count = queryset.filter(from_email__in=candidate_emails).count()
+        non_candidate_emails_count = total_emails - candidate_emails_count
+        
+        return JsonResponse({
+            'success': True,
+            'emails': enhanced_emails,
+            'page': page,
+            'page_size': page_size,
+            'total': total_emails,
+            'counts': {
+                'all': total_emails,
+                'candidates': candidate_emails_count,
+                'non_candidates': non_candidate_emails_count
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to get emails with candidate status: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_candidate_emails(request):
+    """
+    Get emails by candidate email address
+    """
+    try:
+        candidate_email = request.GET.get('candidate_email')
+        if not candidate_email:
+            return JsonResponse({
+                'success': False,
+                'error': 'candidate_email parameter is required'
+            }, status=400)
+        
+        # Get emails from this candidate
+        emails = EmailMessage.objects.filter(
+            from_email__iexact=candidate_email
+        ).order_by('-received_datetime')
+        
+        email_list = []
+        for email in emails:
+            email_dict = email.to_dict()
+            
+            # Add connection info if exists
+            connection = email.candidate_connections.first()
+            if connection:
+                email_dict['email_connection'] = {
+                    'email_type': connection.email_type,
+                    'requires_response': connection.requires_response,
+                    'is_responded': connection.is_responded,
+                    'internal_notes': connection.internal_notes
+                }
+            
+            email_list.append(email_dict)
+        
+        return JsonResponse({
+            'success': True,
+            'emails': email_list,
+            'total': len(email_list)
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to get candidate emails: {str(e)}")
         return JsonResponse({
             'success': False,
             'error': str(e)

@@ -22,3 +22,7 @@ INFO 2025-06-11 19:40:09,585 signals 73149 8433520448 New MPR created: 2025-0003
 INFO 2025-06-11 19:40:09,585 signals 73149 8433520448 TODO: Send notification for new MPR 2025-0003
 INFO 2025-06-11 19:40:09,587 signals 73149 8433520448 New MPR created: 2025-0004 by system_admin
 INFO 2025-06-11 19:40:09,587 signals 73149 8433520448 TODO: Send notification for new MPR 2025-0004
+INFO 2025-06-12 14:03:16,566 signals 10596 25036 New MPR created: 2025-0005 by shbabazade
+INFO 2025-06-12 14:03:16,569 signals 10596 25036 TODO: Send notification for new MPR 2025-0005
+INFO 2025-06-12 14:03:48,049 signals 10596 25036 MPR 2025-0005 status changed from draft to pending
+INFO 2025-06-12 14:03:48,050 signals 10596 25036 TODO: Notify approvers about MPR 2025-0005 pending approval

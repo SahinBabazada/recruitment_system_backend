@@ -403,18 +403,39 @@ def refresh_token(request):
         'scope': 'openid profile email User.Read Mail.Read Calendars.Read Files.Read'
     }
     
-    response = requests.post(token_url, data=token_data)
-    token_json = response.json()
-    
-    if 'access_token' in token_json:
-        request.user.access_token = token_json['access_token']
-        if 'refresh_token' in token_json:
-            request.user.refresh_token = token_json['refresh_token']
-        request.user.save()
+    try:
+        response = requests.post(token_url, data=token_data)
+        token_json = response.json()
         
-        return JsonResponse({'message': 'Token refreshed successfully'})
-    
-    return JsonResponse({'error': 'Failed to refresh token'}, status=400)
+        if 'access_token' in token_json:
+            # Update user's tokens
+            request.user.access_token = token_json['access_token']
+            if 'refresh_token' in token_json:
+                request.user.refresh_token = token_json['refresh_token']
+            request.user.save()
+            
+            # Return data in the format expected by frontend
+            return JsonResponse({
+                'message': 'Token refreshed successfully',
+                'access_token': token_json['access_token'],
+                'user': {
+                    'id': str(request.user.id),
+                    'username': request.user.username,
+                    'email': request.user.email,
+                    'azure_id': request.user.azure_id,
+                    'first_name': request.user.first_name or '',
+                    'last_name': request.user.last_name or '',
+                    'access_token': token_json['access_token']
+                }
+            })
+        else:
+            error_msg = token_json.get('error_description', 'Failed to refresh token')
+            return JsonResponse({'error': error_msg}, status=400)
+            
+    except requests.RequestException as e:
+        return JsonResponse({'error': f'Network error: {str(e)}'}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': f'Unexpected error: {str(e)}'}, status=500)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

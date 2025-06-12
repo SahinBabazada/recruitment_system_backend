@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from datetime import timedelta, datetime
 
+
 from .models import (
     InterviewRound, Interview, InterviewParticipant, 
     InterviewCriteriaEvaluation, InterviewQuestion,
@@ -24,7 +25,6 @@ from .serializers import (
     InterviewParticipantFeedbackSerializer
 )
 from .filters import InterviewFilter, InterviewParticipantFilter
-
 
 class InterviewRoundViewSet(viewsets.ModelViewSet):
     """
@@ -130,100 +130,7 @@ class InterviewViewSet(viewsets.ModelViewSet):
             )
         
         return queryset
-        
-    #Add this action to your InterviewViewSet in views.py
-    @action(detail=False, methods=['get'])
-    def dashboard_stats(self, request):
-        """Get dashboard statistics for interviews"""
-        from django.db.models import Count, Avg, Q
-        from django.utils import timezone
-        from datetime import timedelta
-        
-        # Get date ranges
-        today = timezone.now().date()
-        week_ago = today - timedelta(days=7)
-        month_ago = today - timedelta(days=30)
-        
-        # Base queryset
-        interviews = Interview.objects.all()
-        
-        # Basic counts
-        total_interviews = interviews.count()
-        completed_interviews = interviews.filter(status='completed').count()
-        upcoming_interviews = interviews.filter(
-            scheduled_date__gte=timezone.now(),
-            status__in=['scheduled', 'confirmed']
-        ).count()
-        
-        # Recent activity
-        recent_interviews = interviews.filter(
-            created_at__gte=week_ago
-        ).count()
-        
-        # Status distribution
-        status_distribution = {}
-        for status_choice, label in Interview.STATUS_CHOICES:
-            count = interviews.filter(status=status_choice).count()
-            status_distribution[status_choice] = {
-                'label': label,
-                'count': count,
-                'percentage': round((count / total_interviews * 100), 2) if total_interviews > 0 else 0
-            }
-        
-        # Recommendation distribution (for completed interviews)
-        recommendation_distribution = {}
-        completed = interviews.filter(status='completed')
-        completed_count = completed.count()
-        
-        if completed_count > 0:
-            for rec_choice, label in Interview.RECOMMENDATION_CHOICES:
-                count = completed.filter(recommendation=rec_choice).count()
-                recommendation_distribution[rec_choice] = {
-                    'label': label,
-                    'count': count,
-                    'percentage': round((count / completed_count * 100), 2) if completed_count > 0 else 0
-                }
-        
-        # Average scores
-        avg_score = completed.aggregate(avg=Avg('overall_score'))['avg']
-        
-        # Interviews by round
-        round_stats = interviews.values(
-            'interview_round__name'
-        ).annotate(
-            count=Count('id'),
-            completed=Count('id', filter=Q(status='completed')),
-            avg_score=Avg('overall_score', filter=Q(status='completed'))
-        ).order_by('-count')
-        
-        # This week's activity
-        this_week = interviews.filter(
-            scheduled_date__gte=week_ago,
-            scheduled_date__lte=today + timedelta(days=1)
-        )
-        
-        week_stats = {
-            'scheduled': this_week.filter(status__in=['scheduled', 'confirmed']).count(),
-            'completed': this_week.filter(status='completed').count(),
-            'cancelled': this_week.filter(status='cancelled').count(),
-        }
-        
-        stats = {
-            'total_interviews': total_interviews,
-            'completed_interviews': completed_interviews,
-            'upcoming_interviews': upcoming_interviews,
-            'recent_interviews': recent_interviews,
-            'completion_rate': round((completed_interviews / total_interviews * 100), 2) if total_interviews > 0 else 0,
-            'average_score': round(avg_score, 2) if avg_score else None,
-            'status_distribution': status_distribution,
-            'recommendation_distribution': recommendation_distribution,
-            'round_statistics': list(round_stats),
-            'week_activity': week_stats,
-            'generated_at': timezone.now()
-        }
-        
-        return Response(stats)
-
+    
     @action(detail=True, methods=['post'])
     def update_status(self, request, pk=None):
         """Update interview status"""
@@ -435,61 +342,153 @@ class InterviewViewSet(viewsets.ModelViewSet):
             'recommendation': interview.recommendation
         })
     
+    # @action(detail=False, methods=['get'])
+    # def dashboard_stats(self, request):
+    #     """Get dashboard statistics for interviews"""
+    #     total_interviews = Interview.objects.count()
+        
+    #     # Today's interviews
+    #     today = timezone.now().date()
+    #     today_interviews = Interview.objects.filter(
+    #         scheduled_date__date=today
+    #     ).count()
+        
+    #     # This week's interviews
+    #     week_start = today - timedelta(days=today.weekday())
+    #     week_end = week_start + timedelta(days=6)
+    #     week_interviews = Interview.objects.filter(
+    #         scheduled_date__date__range=[week_start, week_end]
+    #     ).count()
+        
+    #     # Upcoming interviews
+    #     upcoming_interviews = Interview.objects.filter(
+    #         scheduled_date__gt=timezone.now(),
+    #         status__in=['scheduled', 'confirmed']
+    #     ).count()
+        
+    #     # Overdue interviews
+    #     overdue_interviews = Interview.objects.filter(
+    #         scheduled_date__lt=timezone.now(),
+    #         status__in=['scheduled', 'confirmed']
+    #     ).count()
+        
+    #     # Status distribution
+    #     status_stats = {}
+    #     for status_choice, label in Interview.STATUS_CHOICES:
+    #         count = Interview.objects.filter(status=status_choice).count()
+    #         status_stats[status_choice] = {
+    #             'label': label,
+    #             'count': count,
+    #             'percentage': round((count / total_interviews * 100), 2) if total_interviews > 0 else 0
+    #         }
+        
+    #     # Average scores
+    #     completed_interviews = Interview.objects.filter(status='completed')
+    #     avg_score = completed_interviews.aggregate(avg=Avg('overall_score'))['avg']
+        
+    #     return Response({
+    #         'total_interviews': total_interviews,
+    #         'today_interviews': today_interviews,
+    #         'week_interviews': week_interviews,
+    #         'upcoming_interviews': upcoming_interviews,
+    #         'overdue_interviews': overdue_interviews,
+    #         'status_distribution': status_stats,
+    #         'average_score': avg_score,
+    #         'completed_interviews': completed_interviews.count()
+    #     })
+    
     @action(detail=False, methods=['get'])
     def dashboard_stats(self, request):
         """Get dashboard statistics for interviews"""
-        total_interviews = Interview.objects.count()
+        from django.db.models import Count, Avg, Q
+        from django.utils import timezone
+        from datetime import timedelta
         
-        # Today's interviews
+        # Get date ranges
         today = timezone.now().date()
-        today_interviews = Interview.objects.filter(
-            scheduled_date__date=today
-        ).count()
+        week_ago = today - timedelta(days=7)
+        month_ago = today - timedelta(days=30)
         
-        # This week's interviews
-        week_start = today - timedelta(days=today.weekday())
-        week_end = week_start + timedelta(days=6)
-        week_interviews = Interview.objects.filter(
-            scheduled_date__date__range=[week_start, week_end]
-        ).count()
+        # Base queryset
+        interviews = Interview.objects.all()
         
-        # Upcoming interviews
-        upcoming_interviews = Interview.objects.filter(
-            scheduled_date__gt=timezone.now(),
+        # Basic counts
+        total_interviews = interviews.count()
+        completed_interviews = interviews.filter(status='completed').count()
+        upcoming_interviews = interviews.filter(
+            scheduled_date__gte=timezone.now(),
             status__in=['scheduled', 'confirmed']
         ).count()
         
-        # Overdue interviews
-        overdue_interviews = Interview.objects.filter(
-            scheduled_date__lt=timezone.now(),
-            status__in=['scheduled', 'confirmed']
+        # Recent activity
+        recent_interviews = interviews.filter(
+            created_at__gte=week_ago
         ).count()
         
         # Status distribution
-        status_stats = {}
+        status_distribution = {}
         for status_choice, label in Interview.STATUS_CHOICES:
-            count = Interview.objects.filter(status=status_choice).count()
-            status_stats[status_choice] = {
+            count = interviews.filter(status=status_choice).count()
+            status_distribution[status_choice] = {
                 'label': label,
                 'count': count,
                 'percentage': round((count / total_interviews * 100), 2) if total_interviews > 0 else 0
             }
         
-        # Average scores
-        completed_interviews = Interview.objects.filter(status='completed')
-        avg_score = completed_interviews.aggregate(avg=Avg('overall_score'))['avg']
+        # Recommendation distribution (for completed interviews)
+        recommendation_distribution = {}
+        completed = interviews.filter(status='completed')
+        completed_count = completed.count()
         
-        return Response({
+        if completed_count > 0:
+            for rec_choice, label in Interview.RECOMMENDATION_CHOICES:
+                count = completed.filter(recommendation=rec_choice).count()
+                recommendation_distribution[rec_choice] = {
+                    'label': label,
+                    'count': count,
+                    'percentage': round((count / completed_count * 100), 2) if completed_count > 0 else 0
+                }
+        
+        # Average scores
+        avg_score = completed.aggregate(avg=Avg('overall_score'))['avg']
+        
+        # Interviews by round
+        round_stats = interviews.values(
+            'interview_round__name'
+        ).annotate(
+            count=Count('id'),
+            completed=Count('id', filter=Q(status='completed')),
+            avg_score=Avg('overall_score', filter=Q(status='completed'))
+        ).order_by('-count')
+        
+        # This week's activity
+        this_week = interviews.filter(
+            scheduled_date__gte=week_ago,
+            scheduled_date__lte=today + timedelta(days=1)
+        )
+        
+        week_stats = {
+            'scheduled': this_week.filter(status__in=['scheduled', 'confirmed']).count(),
+            'completed': this_week.filter(status='completed').count(),
+            'cancelled': this_week.filter(status='cancelled').count(),
+        }
+        
+        stats = {
             'total_interviews': total_interviews,
-            'today_interviews': today_interviews,
-            'week_interviews': week_interviews,
+            'completed_interviews': completed_interviews,
             'upcoming_interviews': upcoming_interviews,
-            'overdue_interviews': overdue_interviews,
-            'status_distribution': status_stats,
-            'average_score': avg_score,
-            'completed_interviews': completed_interviews.count()
-        })
-    
+            'recent_interviews': recent_interviews,
+            'completion_rate': round((completed_interviews / total_interviews * 100), 2) if total_interviews > 0 else 0,
+            'average_score': round(avg_score, 2) if avg_score else None,
+            'status_distribution': status_distribution,
+            'recommendation_distribution': recommendation_distribution,
+            'round_statistics': list(round_stats),
+            'week_activity': week_stats,
+            'generated_at': timezone.now()
+        }
+        
+        return Response(stats)
+
     @action(detail=False, methods=['get'])
     def upcoming(self, request):
         """Get upcoming interviews"""
@@ -663,5 +662,3 @@ class InterviewFeedbackTemplateViewSet(viewsets.ModelViewSet):
         return Response({'message': 'Template set as default'})
 
 
-# Additional imports needed
-from .filters import InterviewFilter, InterviewParticipantFilter
