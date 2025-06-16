@@ -11,7 +11,8 @@ urlpatterns = [
     path('email_service/', include('email_service.urls')),
     path('users/', include('users.urls')),
     path('api/candidates/', include('candidate.urls')),
-    path('api/interviews/', include('interview.urls'))
+    path('api/interviews/', include('interview.urls')),
+    path('flows/', include('flows.urls')),
 ]
 
 # Add debug toolbar URLs for development
