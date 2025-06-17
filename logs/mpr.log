@@ -26,3 +26,5 @@ INFO 2025-06-12 14:03:16,566 signals 10596 25036 New MPR created: 2025-0005 by s
 INFO 2025-06-12 14:03:16,569 signals 10596 25036 TODO: Send notification for new MPR 2025-0005
 INFO 2025-06-12 14:03:48,049 signals 10596 25036 MPR 2025-0005 status changed from draft to pending
 INFO 2025-06-12 14:03:48,050 signals 10596 25036 TODO: Notify approvers about MPR 2025-0005 pending approval
+INFO 2025-06-17 23:43:26,183 signals 19160 21536 MPR 2025-0005 status changed from pending to approved
+INFO 2025-06-17 23:43:26,201 signals 19160 21536 TODO: Notify about MPR 2025-0005 approval

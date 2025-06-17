@@ -19,19 +19,28 @@ from .models import (
     Employee, TechnicalSkill, Language, Competency, ContractDuration,
     MPR, MPRComment, MPRStatusHistory, Recruiter, Manager, BudgetHolder, BudgetSponsor
 )
+
 from .serializers import (
     JobSerializer, OrganizationalUnitSerializer, LocationSerializer,
     EmploymentTypeSerializer, HiringReasonSerializer, EmployeeSerializer,
     TechnicalSkillSerializer, LanguageSerializer, CompetencySerializer,
     ContractDurationSerializer, MPRListSerializer, MPRDetailSerializer,
     MPRCreateSerializer, MPRCommentSerializer, MPRApprovalSerializer,
-    MPRStatusHistorySerializer,OrganizationalUnitListSerializer, OrganizationalUnitDetailSerializer,
+    MPRStatusHistorySerializer, OrganizationalUnitListSerializer, OrganizationalUnitDetailSerializer,
     OrganizationalUnitCreateSerializer, RecruiterSerializer, ManagerSerializer,
     BudgetHolderSerializer, BudgetSponsorSerializer, RoleAssignmentBulkSerializer, OrganizationalUnitStatsSerializer,
     UserSerializer
 )
+
 from .filters import MPRFilter
 
+try:
+    from flows.utils import execute_flow_for_mpr, FlowExecutor
+    from flows.models import Flow
+    FLOWS_AVAILABLE = True
+except ImportError:
+    FLOWS_AVAILABLE = False
+    
 User = get_user_model()
 
 class JobViewSet(viewsets.ModelViewSet):
@@ -264,7 +273,7 @@ class ContractDurationViewSet(viewsets.ReadOnlyModelViewSet):
         return [HasPermission('mpr:view')]
 
 class MPRViewSet(viewsets.ModelViewSet):
-    """ViewSet for MPR forms"""
+    """Enhanced MPR ViewSet with Flow Integration"""
     queryset = MPR.objects.select_related(
         'job_title', 'department', 'division', 'unit', 'location',
         'employment_type', 'hiring_reason', 'replaced_employee',
@@ -325,9 +334,46 @@ class MPRViewSet(viewsets.ModelViewSet):
             'dashboard_stats': [],
             'my_tasks': [],
             'export': 'mpr:export',
+            'preview_approval_flow': 'mpr:view',
+            'get_approver_options': 'mpr:view',
         }
         required_permission = permission_map.get(self.action, 'mpr:view')
         return [HasPermission(required_perm) for required_perm in required_permission] if isinstance(required_permission, list) else [HasPermission(required_permission)]
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        """Enhanced create with flow integration"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Create the MPR
+        mpr = serializer.save()
+        
+        # If MPR is being submitted for approval, start flow execution
+        if mpr.status == 'pending' and FLOWS_AVAILABLE:
+            try:
+                active_flow = Flow.get_active_flow()
+                if active_flow:
+                    # Execute flow for this MPR
+                    flow_execution = execute_flow_for_mpr(mpr)
+                    
+                    # Add flow execution info to response
+                    response_data = serializer.data
+                    response_data['flow_execution'] = {
+                        'id': flow_execution.id,
+                        'flow_name': active_flow.name,
+                        'flow_version': active_flow.version,
+                        'status': flow_execution.status,
+                        'current_step': flow_execution.current_node.name if flow_execution.current_node else None
+                    }
+                    
+                    return Response(response_data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                # Log error but don't fail MPR creation
+                print(f"Flow execution failed for MPR {mpr.mpr_number}: {str(e)}")
+        
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     def perform_update(self, serializer):
         """Check if user can edit this MPR"""
@@ -345,9 +391,91 @@ class MPRViewSet(viewsets.ModelViewSet):
             )
         instance.delete()
 
+    @action(detail=False, methods=['post'], permission_classes=[HasPermission('mpr:view')])
+    def preview_approval_flow(self, request):
+        """Preview approval flow for given MPR parameters"""
+        if not FLOWS_AVAILABLE:
+            return Response({
+                'error': 'Flow system not available',
+                'approval_steps': []
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Get form data from request
+            department_id = request.data.get('department_id')
+            priority = request.data.get('priority', 'medium')
+            employment_type_id = request.data.get('employment_type_id')
+            hiring_reason_id = request.data.get('hiring_reason_id')
+            location_id = request.data.get('location_id')
+            budget_amount = request.data.get('budget_amount', 50000)  # Default
+            
+            # Get active flow
+            active_flow = Flow.get_active_flow()
+            if not active_flow:
+                return Response({
+                    'error': 'No active flow found',
+                    'approval_steps': []
+                })
+            
+            # Build execution context
+            execution_context = self._build_preview_context(
+                department_id, priority, employment_type_id, 
+                hiring_reason_id, location_id, budget_amount
+            )
+            
+            # Simulate flow execution
+            approval_steps = self._simulate_flow_execution(active_flow, execution_context)
+            
+            # Get approver options for each step
+            for step in approval_steps:
+                if step['type'] == 'approval' and step.get('approver_type'):
+                    step['approver_options'] = self._get_approver_options(
+                        step['approver_type'], department_id
+                    )
+            
+            return Response({
+                'flow': {
+                    'id': active_flow.id,
+                    'name': active_flow.name,
+                    'version': active_flow.version
+                },
+                'approval_steps': approval_steps,
+                'execution_context': execution_context
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Flow preview failed: {str(e)}',
+                'approval_steps': []
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'], permission_classes=[HasPermission('mpr:view')])
+    def get_approver_options(self, request):
+        """Get available approvers for a specific type and department"""
+        approver_type = request.query_params.get('approver_type')
+        department_id = request.query_params.get('department_id')
+        
+        if not approver_type or not department_id:
+            return Response({
+                'error': 'approver_type and department_id are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            department_id = int(department_id)
+            approvers = self._get_approver_options(approver_type, department_id)
+            return Response({
+                'approver_type': approver_type,
+                'department_id': department_id,
+                'options': approvers
+            })
+        except Exception as e:
+            return Response({
+                'error': f'Failed to get approver options: {str(e)}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
     @action(detail=True, methods=['post'], permission_classes=[HasPermission('mpr:approve')])
     def approve(self, request, pk=None):
-        """Moderate an MPR"""
+        """Enhanced approve with flow integration"""
         mpr = self.get_object()
         serializer = MPRApprovalSerializer(data=request.data)
         
@@ -366,9 +494,46 @@ class MPRViewSet(viewsets.ModelViewSet):
         try:
             if action == 'approve':
                 mpr.approve(request.user)
+                
+                # If flows are available, advance flow execution
+                if FLOWS_AVAILABLE:
+                    try:
+                        flow_executions = mpr.flow_executions.filter(status='in_progress')
+                        for execution in flow_executions:
+                            # Find current approval step
+                            current_step = execution.steps.filter(
+                                status='in_progress',
+                                assigned_to=request.user
+                            ).first()
+                            
+                            if current_step:
+                                executor = FlowExecutor(execution.flow, mpr)
+                                executor.execution = execution
+                                executor.approve_step(
+                                    current_step.id, 
+                                    request.user, 
+                                    approved=True, 
+                                    comments=reason
+                                )
+                    except Exception as e:
+                        print(f"Flow advancement failed: {str(e)}")
+                
                 message = 'MPR approved successfully'
             else:
                 mpr.reject(request.user, reason=reason)
+                
+                # If flows are available, mark flow as failed
+                if FLOWS_AVAILABLE:
+                    try:
+                        flow_executions = mpr.flow_executions.filter(status='in_progress')
+                        for execution in flow_executions:
+                            execution.status = 'failed'
+                            execution.error_message = f'Rejected by {request.user.username}: {reason}'
+                            execution.completed_at = timezone.now()
+                            execution.save()
+                    except Exception as e:
+                        print(f"Flow rejection failed: {str(e)}")
+                
                 message = 'MPR rejected successfully'
             
             MPRStatusHistory.objects.create(
@@ -379,7 +544,22 @@ class MPRViewSet(viewsets.ModelViewSet):
                 reason=reason
             )
             
-            return Response({'message': message, 'status': mpr.status})
+            response_data = {'message': message, 'status': mpr.status}
+            
+            # Add flow information if available
+            if FLOWS_AVAILABLE:
+                flow_execution = mpr.flow_executions.filter(
+                    status__in=['in_progress', 'completed', 'failed']
+                ).first()
+                if flow_execution:
+                    response_data['flow_execution'] = {
+                        'id': flow_execution.id,
+                        'status': flow_execution.status,
+                        'current_step': flow_execution.current_node.name if flow_execution.current_node else None,
+                        'completed_at': flow_execution.completed_at
+                    }
+            
+            return Response(response_data)
         
         except Exception as e:
             return Response(
@@ -389,7 +569,7 @@ class MPRViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[HasPermission('mpr:edit')])
     def submit_for_approval(self, request, pk=None):
-        """Submit MPR for approval"""
+        """Enhanced submit for approval with flow integration"""
         mpr = self.get_object()
         
         if mpr.status != 'draft':
@@ -404,18 +584,326 @@ class MPRViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        MPRStatusHistory.objects.create(
-            mpr=mpr,
-            from_status=mpr.status,
-            to_status='pending',
-            changed_by=request.user,
-            reason='submitted for approval'
-        )
+        try:
+            with transaction.atomic():
+                # Update MPR status
+                MPRStatusHistory.objects.create(
+                    mpr=mpr,
+                    from_status=mpr.status,
+                    to_status='pending',
+                    changed_by=request.user,
+                    reason='submitted for approval'
+                )
+                
+                mpr.status = 'pending'
+                mpr.save(update_fields=['status'])
+                
+                response_data = {'status': 'MPR submitted for approval'}
+                
+                # Start flow execution if flows are available
+                if FLOWS_AVAILABLE:
+                    try:
+                        active_flow = Flow.get_active_flow()
+                        if active_flow:
+                            flow_execution = execute_flow_for_mpr(mpr)
+                            response_data['flow_execution'] = {
+                                'id': flow_execution.id,
+                                'flow_name': active_flow.name,
+                                'flow_version': active_flow.version,
+                                'status': flow_execution.status,
+                                'current_step': flow_execution.current_node.name if flow_execution.current_node else None
+                            }
+                        else:
+                            response_data['warning'] = 'No active flow found. Manual approval required.'
+                    except Exception as e:
+                        response_data['warning'] = f'Flow execution failed: {str(e)}. Manual approval required.'
+                
+                return Response(response_data)
+                
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to submit MPR: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def _build_preview_context(self, department_id, priority, employment_type_id, 
+                              hiring_reason_id, location_id, budget_amount):
+        """Build execution context for flow preview"""
+        context = {
+            'mpr_id': 'preview',
+            'priority': priority,
+            'budget_amount': float(budget_amount),
+            'department': '',
+            'employment_type': '',
+            'location': '',
+            'hiring_reason': '',
+            'position_title': '',
+        }
         
-        mpr.status = 'pending'
-        mpr.save(update_fields=['status'])
+        try:
+            if department_id:
+                dept = OrganizationalUnit.objects.get(id=department_id)
+                context['department'] = dept.name
+                
+            if employment_type_id:
+                emp_type = EmploymentType.objects.get(id=employment_type_id)
+                context['employment_type'] = emp_type.name
+                
+            if location_id:
+                location = Location.objects.get(id=location_id)
+                context['location'] = location.name
+                
+            if hiring_reason_id:
+                reason = HiringReason.objects.get(id=hiring_reason_id)
+                context['hiring_reason'] = reason.name
+                
+        except Exception as e:
+            print(f"Error building context: {str(e)}")
         
-        return Response({'status': 'MPR submitted for approval'})
+        return context
+
+    def _simulate_flow_execution(self, flow, context):
+        """Simulate flow execution to determine approval path"""
+        approval_steps = []
+        
+        # Get flow nodes and connections
+        start_node = None
+        nodes_dict = {}
+        connections_dict = {}
+        
+        for node in flow.nodes.all():
+            nodes_dict[node.node_id] = node
+            if node.node_type == 'start':
+                start_node = node
+        
+        for connection in flow.connections.all():
+            if connection.start_node.node_id not in connections_dict:
+                connections_dict[connection.start_node.node_id] = []
+            connections_dict[connection.start_node.node_id].append(connection)
+        
+        if not start_node:
+            return approval_steps
+        
+        # Traverse flow
+        current_node_id = start_node.node_id
+        step_order = 1
+        visited_nodes = set()
+        
+        while current_node_id and current_node_id not in visited_nodes:
+            visited_nodes.add(current_node_id)
+            current_node = nodes_dict.get(current_node_id)
+            
+            if not current_node:
+                break
+            
+            if current_node.node_type == 'approval':
+                approval_steps.append({
+                    'id': current_node.node_id,
+                    'name': current_node.properties.get('name', f"{current_node.properties.get('approverType', 'Unknown')} Approval"),
+                    'type': 'approval',
+                    'approver_type': current_node.properties.get('approverType'),
+                    'timeout_days': current_node.properties.get('timeoutDays', 5),
+                    'order': step_order,
+                    'status': 'will_execute'
+                })
+                step_order += 1
+                
+            elif current_node.node_type == 'condition':
+                # Evaluate conditions
+                condition_result = self._evaluate_node_conditions(current_node, context)
+                
+                # Find next connection based on condition result
+                connections = connections_dict.get(current_node_id, [])
+                next_connection = None
+                
+                for conn in connections:
+                    if conn.connection_type == ('true' if condition_result else 'false'):
+                        next_connection = conn
+                        break
+                
+                if next_connection:
+                    current_node_id = next_connection.end_node.node_id
+                    continue
+                else:
+                    break
+                    
+            elif current_node.node_type == 'notification':
+                approval_steps.append({
+                    'id': current_node.node_id,
+                    'name': current_node.properties.get('name', 'Notification'),
+                    'type': 'notification',
+                    'order': step_order,
+                    'status': 'will_execute'
+                })
+                step_order += 1
+                
+            elif current_node.node_type == 'end':
+                approval_steps.append({
+                    'id': current_node.node_id,
+                    'name': 'Flow Complete',
+                    'type': 'end',
+                    'order': step_order,
+                    'status': 'will_execute'
+                })
+                break
+            
+            # Find next node
+            connections = connections_dict.get(current_node_id, [])
+            next_connection = None
+            
+            for conn in connections:
+                if conn.connection_type == 'output':
+                    next_connection = conn
+                    break
+            
+            if next_connection:
+                current_node_id = next_connection.end_node.node_id
+            else:
+                break
+        
+        return approval_steps
+
+    def _evaluate_node_conditions(self, node, context):
+        """Evaluate conditions for a condition node"""
+        if not hasattr(node, 'conditions') or not node.conditions.exists():
+            return True
+        
+        conditions = node.conditions.all()
+        logic_operator = node.properties.get('logicOperator', 'AND')
+        
+        results = []
+        for condition in conditions:
+            field_value = context.get(condition.field, '')
+            condition_value = condition.value
+            
+            result = False
+            try:
+                if condition.operator == 'equals':
+                    result = str(field_value).lower() == str(condition_value).lower()
+                elif condition.operator == 'not_equals':
+                    result = str(field_value).lower() != str(condition_value).lower()
+                elif condition.operator == 'greater_than':
+                    result = float(field_value) > float(condition_value)
+                elif condition.operator == 'less_than':
+                    result = float(field_value) < float(condition_value)
+                elif condition.operator == 'greater_equal':
+                    result = float(field_value) >= float(condition_value)
+                elif condition.operator == 'less_equal':
+                    result = float(field_value) <= float(condition_value)
+                elif condition.operator == 'contains':
+                    result = str(condition_value).lower() in str(field_value).lower()
+                elif condition.operator == 'starts_with':
+                    result = str(field_value).lower().startswith(str(condition_value).lower())
+                elif condition.operator == 'ends_with':
+                    result = str(field_value).lower().endswith(str(condition_value).lower())
+                elif condition.operator == 'in_list':
+                    values = [v.strip().lower() for v in condition_value.split(',')]
+                    result = str(field_value).lower() in values
+                elif condition.operator == 'is_null':
+                    result = not field_value or field_value == ''
+                elif condition.operator == 'is_not_null':
+                    result = field_value and field_value != ''
+            except (ValueError, TypeError):
+                result = False
+            
+            results.append(result)
+        
+        if logic_operator == 'AND':
+            return all(results)
+        else:  # OR
+            return any(results)
+
+    def _get_approver_options(self, approver_type, department_id):
+        """Get available approvers based on type and department"""
+        try:
+            department = OrganizationalUnit.objects.get(id=department_id)
+            
+            if approver_type == 'manager':
+                # Get managers for this department
+                managers = Manager.objects.filter(
+                    organizational_unit=department,
+                    is_active=True
+                ).select_related('user')
+                
+                return [{
+                    'id': manager.user.id,
+                    'full_name': manager.user.get_full_name() or manager.user.username,
+                    'email': manager.user.email,
+                    'position': getattr(manager.user, 'position', 'Manager'),
+                    'is_primary': manager.is_primary,
+                    'manager_type': manager.manager_type
+                } for manager in managers]
+                
+            elif approver_type == 'budget_holder':
+                # Get budget holders for this department
+                budget_holders = BudgetHolder.objects.filter(
+                    organizational_unit=department,
+                    is_active=True
+                ).select_related('user')
+                
+                return [{
+                    'id': bh.user.id,
+                    'full_name': bh.user.get_full_name() or bh.user.username,
+                    'email': bh.user.email,
+                    'position': getattr(bh.user, 'position', 'Budget Holder'),
+                    'is_primary': bh.is_primary,
+                    'budget_type': bh.budget_type,
+                    'budget_limit': float(bh.budget_limit) if bh.budget_limit else None
+                } for bh in budget_holders]
+                
+            elif approver_type == 'budget_sponsor':
+                # Get budget sponsors for this department
+                budget_sponsors = BudgetSponsor.objects.filter(
+                    organizational_unit=department,
+                    is_active=True
+                ).select_related('user')
+                
+                return [{
+                    'id': bs.user.id,
+                    'full_name': bs.user.get_full_name() or bs.user.username,
+                    'email': bs.user.email,
+                    'position': getattr(bs.user, 'position', 'Budget Sponsor'),
+                    'is_primary': bs.is_primary,
+                    'sponsor_level': bs.sponsor_level,
+                    'approval_limit': float(bs.approval_limit) if bs.approval_limit else None
+                } for bs in budget_sponsors]
+                
+            elif approver_type == 'recruiter':
+                # Get recruiters for this department
+                recruiters = Recruiter.objects.filter(
+                    organizational_unit=department,
+                    is_active=True
+                ).select_related('user')
+                
+                return [{
+                    'id': recruiter.user.id,
+                    'full_name': recruiter.user.get_full_name() or recruiter.user.username,
+                    'email': recruiter.user.email,
+                    'position': getattr(recruiter.user, 'position', 'Recruiter'),
+                    'is_primary': recruiter.is_primary,
+                    'specialization': recruiter.specialization
+                } for recruiter in recruiters]
+            
+            else:
+                # Fallback to employees in the department
+                employees = Employee.objects.filter(
+                    department=department,
+                    is_active=True
+                ).select_related('user', 'position')
+                
+                return [{
+                    'id': emp.user.id if emp.user else emp.id,
+                    'full_name': emp.full_name,
+                    'email': emp.email,
+                    'position': emp.position.title if emp.position else 'Employee',
+                    'employee_id': emp.employee_id
+                } for emp in employees if emp.user or emp.email]
+                
+        except OrganizationalUnit.DoesNotExist:
+            return []
+        except Exception as e:
+            print(f"Error getting approver options: {str(e)}")
+            return []
 
     @action(detail=True, methods=['post'], permission_classes=[HasPermission('mpr:comment')])
     def add_comment(self, request, pk=None):
@@ -448,6 +936,92 @@ class MPRViewSet(viewsets.ModelViewSet):
         serializer = MPRStatusHistorySerializer(history, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['get'], permission_classes=[HasPermission('mpr:view')])
+    def flow_execution_status(self, request, pk=None):
+        """Get flow execution status for this MPR"""
+        mpr = self.get_object()
+        
+        if not FLOWS_AVAILABLE:
+            return Response({
+                'error': 'Flow system not available',
+                'has_flow': False
+            })
+        
+        try:
+            # Get flow executions for this MPR
+            flow_executions = mpr.flow_executions.all().order_by('-started_at')
+            
+            if not flow_executions.exists():
+                return Response({
+                    'has_flow': False,
+                    'message': 'No flow execution found for this MPR'
+                })
+            
+            # Get the latest execution
+            latest_execution = flow_executions.first()
+            
+            # Get execution steps
+            steps = latest_execution.steps.all().order_by('step_order')
+            
+            steps_data = []
+            for step in steps:
+                step_data = {
+                    'id': step.id,
+                    'step_order': step.step_order,
+                    'node_name': step.node.name,
+                    'node_type': step.node.node_type,
+                    'status': step.status,
+                    'started_at': step.started_at,
+                    'completed_at': step.completed_at,
+                    'assigned_to': {
+                        'id': step.assigned_to.id,
+                        'full_name': step.assigned_to.get_full_name(),
+                        'email': step.assigned_to.email
+                    } if step.assigned_to else None,
+                    'approved_by': {
+                        'id': step.approved_by.id,
+                        'full_name': step.approved_by.get_full_name(),
+                        'email': step.approved_by.email
+                    } if step.approved_by else None,
+                    'approved_at': step.approved_at,
+                    'error_message': step.error_message,
+                    'input_data': step.input_data,
+                    'output_data': step.output_data
+                }
+                steps_data.append(step_data)
+            
+            execution_data = {
+                'has_flow': True,
+                'execution': {
+                    'id': latest_execution.id,
+                    'flow_name': latest_execution.flow.name,
+                    'flow_version': latest_execution.flow.version,
+                    'status': latest_execution.status,
+                    'started_at': latest_execution.started_at,
+                    'completed_at': latest_execution.completed_at,
+                    'current_node': {
+                        'id': latest_execution.current_node.id,
+                        'name': latest_execution.current_node.name,
+                        'type': latest_execution.current_node.node_type
+                    } if latest_execution.current_node else None,
+                    'error_message': latest_execution.error_message,
+                    'execution_context': latest_execution.execution_context
+                },
+                'steps': steps_data,
+                'pending_approvals': [
+                    step_data for step_data in steps_data 
+                    if step_data['status'] == 'in_progress' and step_data['assigned_to']
+                ]
+            }
+            
+            return Response(execution_data)
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to get flow execution status: {str(e)}',
+                'has_flow': False
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=False, methods=['get'], permission_classes=[])
     def dashboard_stats(self, request):
         """Get dashboard statistics for MPRs"""
@@ -466,17 +1040,37 @@ class MPRViewSet(viewsets.ModelViewSet):
             'recent_activity': queryset.filter(created_at__gte=timezone.now() - timedelta(days=7)).count(),
         }
         
+        # Add flow statistics if available
+        if FLOWS_AVAILABLE:
+            try:
+                from flows.models import FlowExecution
+                
+                # Get flow execution statistics
+                total_executions = FlowExecution.objects.count()
+                active_executions = FlowExecution.objects.filter(status='in_progress').count()
+                completed_executions = FlowExecution.objects.filter(status='completed').count()
+                
+                stats['flow_stats'] = {
+                    'total_executions': total_executions,
+                    'active_executions': active_executions,
+                    'completed_executions': completed_executions,
+                    'success_rate': (completed_executions / total_executions * 100) if total_executions > 0 else 0
+                }
+            except Exception as e:
+                stats['flow_stats'] = {'error': str(e)}
+        
         return Response(stats)
 
     @action(detail=False, methods=['get'], permission_classes=[])
     def my_tasks(self, request):
-        """Get user's MPR-related tasks"""
+        """Get user's MPR-related tasks including flow approvals"""
         user = request.user
         tasks = {
             'drafts_to_complete': [],
             'pending_approval': [],
             'assigned_as_recruiter': [],
-            'budget_holder_for': []
+            'budget_holder_for': [],
+            'flow_approvals': []
         }
         
         drafts = self.get_queryset().filter(created_by=user, status='draft')[:5]
@@ -492,6 +1086,44 @@ class MPRViewSet(viewsets.ModelViewSet):
         budget_mprs = self.get_queryset().filter(budget_holder=user, status__in=['pending', 'approved'])[:5]
         tasks['budget_holder_for'] = MPRListSerializer(budget_mprs, many=True).data
         
+        # Add flow approval tasks if available
+        if FLOWS_AVAILABLE:
+            try:
+                from flows.utils import get_pending_approvals_for_user
+                
+                pending_steps = get_pending_approvals_for_user(user)
+                flow_approvals = []
+                
+                for step in pending_steps:
+                    mpr = step.execution.mpr
+                    flow_approvals.append({
+                        'step_id': step.id,
+                        'mpr': {
+                            'id': mpr.id,
+                            'mpr_number': mpr.mpr_number,
+                            'job_title': mpr.job_title.title,
+                            'department': mpr.department.name,
+                            'created_at': mpr.created_at,
+                            'priority': mpr.priority
+                        },
+                        'flow': {
+                            'name': step.execution.flow.name,
+                            'version': step.execution.flow.version
+                        },
+                        'step': {
+                            'name': step.node.name,
+                            'type': step.node.node_type,
+                            'started_at': step.started_at,
+                            'step_order': step.step_order
+                        }
+                    })
+                
+                tasks['flow_approvals'] = flow_approvals[:10]  # Limit to 10
+                
+            except Exception as e:
+                tasks['flow_approvals'] = []
+                print(f"Error getting flow approvals: {str(e)}")
+        
         return Response(tasks)
 
     @action(detail=False, methods=['get'], permission_classes=[HasPermission('mpr:export')])
@@ -503,11 +1135,25 @@ class MPRViewSet(viewsets.ModelViewSet):
         writer = csv.writer(response)
         writer.writerow([
             'MPR Number', 'Job Title', 'Department', 'Status', 'Priority',
-            'Location', 'Desired Start Date', 'Created By', 'Created At'
+            'Location', 'Desired Start Date', 'Created By', 'Created At',
+            'Flow Status', 'Current Step'
         ])
         
         queryset = self.filter_queryset(self.get_queryset())
         for mpr in queryset:
+            flow_status = 'No Flow'
+            current_step = 'N/A'
+            
+            if FLOWS_AVAILABLE:
+                try:
+                    latest_execution = mpr.flow_executions.order_by('-started_at').first()
+                    if latest_execution:
+                        flow_status = latest_execution.status
+                        if latest_execution.current_node:
+                            current_step = latest_execution.current_node.name
+                except Exception:
+                    pass
+            
             writer.writerow([
                 mpr.mpr_number,
                 mpr.job_title.title,
@@ -517,11 +1163,13 @@ class MPRViewSet(viewsets.ModelViewSet):
                 mpr.location.name,
                 mpr.desired_start_date,
                 mpr.created_by.username,
-                mpr.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                mpr.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                flow_status,
+                current_step
             ])
         
         return response
-
+    
 class OrganizationalUnitViewSet(viewsets.ModelViewSet):
     """Enhanced ViewSet for OrganizationalUnit with comprehensive functionality"""
     permission_classes = [IsAuthenticated]
