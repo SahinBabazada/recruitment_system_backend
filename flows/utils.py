@@ -1,8 +1,10 @@
-# flows/utils.py
+# flows/utils.py - Fixed condition evaluation
 from datetime import timezone
 from django.contrib.auth import get_user_model
 from .models import Flow, FlowExecution, FlowExecutionStep
+import logging
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 def create_flow_permissions():
@@ -90,6 +92,8 @@ class FlowExecutor:
             'location': self.mpr.location.name if hasattr(self.mpr, 'location') and self.mpr.location else None,
             'hiring_reason': self.mpr.hiring_reason.name if hasattr(self.mpr, 'hiring_reason') and self.mpr.hiring_reason else None,
             'position_title': getattr(self.mpr, 'position_title', ''),
+            'position_level': getattr(self.mpr, 'position_level', 'mid'),
+            'salary_range': float(getattr(self.mpr, 'salary_range', 0)),
             'created_at': self.mpr.created_at.isoformat() if hasattr(self.mpr, 'created_at') else None,
         }
     
@@ -132,98 +136,160 @@ class FlowExecutor:
             self._process_step(next_step)
     
     def _evaluate_conditions(self, condition_node):
-        """Evaluate conditions for a condition node"""
-        conditions = condition_node.conditions.all()
-        groups = condition_node.condition_groups.all()
+        """Evaluate conditions for a condition node - FIXED VERSION"""
+        logger.info(f"Evaluating conditions for node {condition_node.name}")
         
-        if not conditions:
-            # No conditions, take 'false' path
+        # Get conditions and groups from node properties
+        properties = condition_node.properties or {}
+        conditions_data = properties.get('conditions', [])
+        groups_data = properties.get('groups', [])
+        main_logic = properties.get('logicOperator', 'AND')
+        
+        logger.info(f"Found {len(conditions_data)} conditions and {len(groups_data)} groups")
+        logger.info(f"Main logic operator: {main_logic}")
+        
+        if not conditions_data:
+            logger.warning("No conditions found, taking 'false' path")
             return condition_node.outgoing_connections.filter(connection_type='false').first()
+        
+        # If we have conditions but no groups, create a default group
+        if not groups_data:
+            groups_data = [{'id': 1, 'logic': 'AND', 'parentGroup': None}]
         
         # Group conditions by group_id
         condition_groups = {}
-        for condition in conditions:
-            if condition.group_id not in condition_groups:
-                condition_groups[condition.group_id] = []
-            condition_groups[condition.group_id].append(condition)
+        for condition in conditions_data:
+            group_id = condition.get('group', 1)
+            if group_id not in condition_groups:
+                condition_groups[group_id] = []
+            condition_groups[group_id].append(condition)
         
         # Evaluate each group
         group_results = {}
-        for group in groups:
-            group_conditions = condition_groups.get(group.group_id, [])
+        for group in groups_data:
+            group_id = group.get('id', 1)
+            group_logic = group.get('logic', 'AND')
+            group_conditions = condition_groups.get(group_id, [])
+            
+            logger.info(f"Evaluating group {group_id} with {len(group_conditions)} conditions using {group_logic} logic")
+            
             if not group_conditions:
-                group_results[group.group_id] = True
+                group_results[group_id] = True
                 continue
             
             # Evaluate conditions in the group
             results = []
             for condition in group_conditions:
-                result = self._evaluate_single_condition(condition)
-                results.append(result)
+                try:
+                    result = self._evaluate_single_condition(condition)
+                    results.append(result)
+                    logger.info(f"Condition {condition.get('field')} {condition.get('operator')} {condition.get('value')} = {result}")
+                except Exception as e:
+                    logger.error(f"Error evaluating condition: {e}")
+                    results.append(False)
             
             # Apply group logic
-            if group.logic_operator == 'AND':
-                group_results[group.group_id] = all(results)
+            if group_logic == 'AND':
+                group_results[group_id] = all(results)
             else:  # OR
-                group_results[group.group_id] = any(results)
+                group_results[group_id] = any(results)
+            
+            logger.info(f"Group {group_id} result: {group_results[group_id]}")
         
-        # Apply main logic operator
-        main_logic = condition_node.properties.get('logicOperator', 'AND')
+        # Apply main logic operator between groups
         if main_logic == 'AND':
-            final_result = all(group_results.values())
+            final_result = all(group_results.values()) if group_results else False
         else:  # OR
-            final_result = any(group_results.values())
+            final_result = any(group_results.values()) if group_results else False
+        
+        logger.info(f"Final condition result: {final_result}")
         
         # Return appropriate connection
         connection_type = 'true' if final_result else 'false'
-        return condition_node.outgoing_connections.filter(connection_type=connection_type).first()
+        connection = condition_node.outgoing_connections.filter(connection_type=connection_type).first()
+        
+        if not connection:
+            logger.warning(f"No {connection_type} connection found, looking for alternative")
+            # Fallback to any available connection
+            connection = condition_node.outgoing_connections.first()
+        
+        return connection
     
     def _evaluate_single_condition(self, condition):
-        """Evaluate a single condition against MPR data"""
+        """Evaluate a single condition against MPR data - FIXED VERSION"""
+        field = condition.get('field')
+        operator = condition.get('operator')
+        value = condition.get('value', '')
+        
+        if not field or not operator:
+            logger.warning(f"Invalid condition: field={field}, operator={operator}")
+            return False
+        
         context = self.execution.execution_context
-        field_value = context.get(condition.field)
-        condition_value = condition.value
+        field_value = context.get(field)
         
-        # Handle different operators
-        if condition.operator == 'equals':
-            return str(field_value) == str(condition_value)
-        elif condition.operator == 'not_equals':
-            return str(field_value) != str(condition_value)
-        elif condition.operator == 'greater_than':
-            try:
-                return float(field_value) > float(condition_value)
-            except (ValueError, TypeError):
-                return False
-        elif condition.operator == 'less_than':
-            try:
-                return float(field_value) < float(condition_value)
-            except (ValueError, TypeError):
-                return False
-        elif condition.operator == 'greater_equal':
-            try:
-                return float(field_value) >= float(condition_value)
-            except (ValueError, TypeError):
-                return False
-        elif condition.operator == 'less_equal':
-            try:
-                return float(field_value) <= float(condition_value)
-            except (ValueError, TypeError):
-                return False
-        elif condition.operator == 'contains':
-            return condition_value.lower() in str(field_value).lower()
-        elif condition.operator == 'starts_with':
-            return str(field_value).lower().startswith(condition_value.lower())
-        elif condition.operator == 'ends_with':
-            return str(field_value).lower().endswith(condition_value.lower())
-        elif condition.operator == 'in_list':
-            values = [v.strip() for v in condition_value.split(',')]
-            return str(field_value) in values
-        elif condition.operator == 'is_null':
-            return field_value is None or field_value == ''
-        elif condition.operator == 'is_not_null':
-            return field_value is not None and field_value != ''
+        logger.debug(f"Evaluating: {field} ({field_value}) {operator} {value}")
         
-        return False
+        try:
+            # Handle different operators
+            if operator == 'equals':
+                return str(field_value).lower() == str(value).lower()
+            
+            elif operator == 'not_equals':
+                return str(field_value).lower() != str(value).lower()
+            
+            elif operator in ['greater_than', 'less_than', 'greater_equal', 'less_equal']:
+                try:
+                    field_num = float(field_value) if field_value is not None else 0
+                    value_num = float(value) if value else 0
+                    
+                    if operator == 'greater_than':
+                        return field_num > value_num
+                    elif operator == 'less_than':
+                        return field_num < value_num
+                    elif operator == 'greater_equal':
+                        return field_num >= value_num
+                    elif operator == 'less_equal':
+                        return field_num <= value_num
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Numeric comparison failed for {field_value} {operator} {value}: {e}")
+                    return False
+            
+            elif operator == 'contains':
+                field_str = str(field_value).lower() if field_value is not None else ''
+                value_str = str(value).lower()
+                return value_str in field_str
+            
+            elif operator == 'starts_with':
+                field_str = str(field_value).lower() if field_value is not None else ''
+                value_str = str(value).lower()
+                return field_str.startswith(value_str)
+            
+            elif operator == 'ends_with':
+                field_str = str(field_value).lower() if field_value is not None else ''
+                value_str = str(value).lower()
+                return field_str.endswith(value_str)
+            
+            elif operator == 'in_list':
+                if not value:
+                    return False
+                values = [v.strip().lower() for v in str(value).split(',')]
+                field_str = str(field_value).lower() if field_value is not None else ''
+                return field_str in values
+            
+            elif operator == 'is_null':
+                return field_value is None or field_value == '' or field_value == 'null'
+            
+            elif operator == 'is_not_null':
+                return field_value is not None and field_value != '' and field_value != 'null'
+            
+            else:
+                logger.warning(f"Unknown operator: {operator}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error evaluating condition {field} {operator} {value}: {e}")
+            return False
     
     def _process_step(self, step):
         """Process a step based on its node type"""
@@ -320,8 +386,8 @@ class FlowExecutor:
         
         # Here you would integrate with your email service
         # For now, we'll just log the notification
-        print(f"Notification sent: {subject} to {recipients}")
-        print(f"Message: {message}")
+        logger.info(f"Notification sent: {subject} to {recipients}")
+        logger.info(f"Message: {message}")
     
     def approve_step(self, step_id, user, approved=True, comments=""):
         """Approve or reject an approval step"""
