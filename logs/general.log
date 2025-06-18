@@ -183,3 +183,5 @@ ERROR 2025-06-11 19:40:09,567 email_integration 73149 8433520448 Email sync fail
 ERROR 2025-06-11 19:40:09,568 email_integration 73149 8433520448 Email sync failed: contains lookup is not supported on this database backend.
 ERROR 2025-06-11 19:40:09,569 email_integration 73149 8433520448 Email sync failed: contains lookup is not supported on this database backend.
 ERROR 2025-06-12 17:36:55,113 email_integration 18236 12692 Email sync failed: contains lookup is not supported on this database backend.
+INFO 2025-06-18 17:21:03,732 views 19392 26076 Created new user from Azure: msultanli
+INFO 2025-06-18 17:21:03,793 views 19392 26076 Assigned default role 'Employee' to user: msultanli

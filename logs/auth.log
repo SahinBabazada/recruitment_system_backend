@@ -413,3 +413,59 @@ INFO 2025-06-17 20:48:15,825 views 75232 19892 Creating/updating user - Azure ID
 INFO 2025-06-17 20:48:16,385 views 75232 19892 Updated existing user: shbabazade
 INFO 2025-06-17 23:41:50,413 views 19160 16956 Creating/updating user - Azure ID: e839e4be-c776-44ab-9e69-213d44a243cf, Email: shbabazade@azerbaijansupermarket.com
 INFO 2025-06-17 23:41:50,950 views 19160 16956 Updated existing user: shbabazade
+INFO 2025-06-18 09:45:14,782 views 24712 15480 Creating/updating user - Azure ID: e839e4be-c776-44ab-9e69-213d44a243cf, Email: shbabazade@azerbaijansupermarket.com
+INFO 2025-06-18 09:45:15,111 views 24712 15480 Updated existing user: shbabazade
+INFO 2025-06-18 12:03:10,140 views 24712 29620 Creating/updating user - Azure ID: e839e4be-c776-44ab-9e69-213d44a243cf, Email: shbabazade@azerbaijansupermarket.com
+INFO 2025-06-18 12:03:10,204 views 24712 29620 Updated existing user: shbabazade
+INFO 2025-06-18 12:24:23,599 views 24712 25836 Creating/updating user - Azure ID: e839e4be-c776-44ab-9e69-213d44a243cf, Email: shbabazade@azerbaijansupermarket.com
+INFO 2025-06-18 12:24:23,631 views 24712 25836 Updated existing user: shbabazade
+INFO 2025-06-18 15:34:18,117 views 24712 11100 Creating/updating user - Azure ID: e839e4be-c776-44ab-9e69-213d44a243cf, Email: shbabazade@azerbaijansupermarket.com
+INFO 2025-06-18 15:34:18,207 views 24712 11100 Updated existing user: shbabazade
+INFO 2025-06-18 17:04:32,329 views 19392 20188 Creating/updating user - Azure ID: e839e4be-c776-44ab-9e69-213d44a243cf, Email: shbabazade@azerbaijansupermarket.com
+INFO 2025-06-18 17:04:33,879 views 19392 20188 Updated existing user: shbabazade
+INFO 2025-06-18 18:25:50,374 views 19392 26668 Creating/updating user - Azure ID: e839e4be-c776-44ab-9e69-213d44a243cf, Email: shbabazade@azerbaijansupermarket.com
+INFO 2025-06-18 18:25:50,410 views 19392 26668 Updated existing user: shbabazade
+ERROR 2025-06-18 18:40:29,952 authentication 19392 4552 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:30,031 authentication 19392 27576 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:30,201 authentication 19392 26832 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:30,366 authentication 19392 19932 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:30,640 authentication 19392 26868 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:31,425 authentication 19392 27576 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:31,474 authentication 19392 4552 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:31,636 authentication 19392 12720 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:31,766 authentication 19392 26832 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:31,836 authentication 19392 26868 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:32,006 authentication 19392 19932 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:32,740 authentication 19392 27576 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:32,741 authentication 19392 4552 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:32,978 authentication 19392 12720 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:33,135 authentication 19392 26832 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:33,409 authentication 19392 19932 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:34,252 authentication 19392 27576 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:34,273 authentication 19392 4552 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:34,363 authentication 19392 12720 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:34,543 authentication 19392 26832 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:34,819 authentication 19392 19932 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:35,772 authentication 19392 26868 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:35,882 authentication 19392 4552 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:35,982 authentication 19392 27576 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:35,982 authentication 19392 12720 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:35,983 authentication 19392 26832 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:36,630 authentication 19392 19932 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:36,967 authentication 19392 26868 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:37,665 authentication 19392 4552 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:37,698 authentication 19392 27576 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:37,997 authentication 19392 19932 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:37,998 authentication 19392 12720 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:38,036 authentication 19392 26832 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:38,356 authentication 19392 26868 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:39,534 authentication 19392 4552 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:40,095 authentication 19392 19932 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:40,096 authentication 19392 26868 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:40,130 authentication 19392 26832 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:40,258 authentication 19392 12720 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:40,527 authentication 19392 27576 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:41,968 authentication 19392 4552 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:41,968 authentication 19392 26868 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:42,081 authentication 19392 26832 Authentication failed: Token validation failed - invalid or expired token
+ERROR 2025-06-18 18:40:42,603 authentication 19392 12720 Authentication failed: Token validation failed - invalid or expired token
